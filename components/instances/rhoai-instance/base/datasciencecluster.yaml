@@ -18,6 +18,8 @@ spec:
       managementState: Removed
       modelsAsAService:
         managementState: Removed
+    mcplifecycleoperator:
+      managementState: Managed
     kserve:
       managementState: Managed
       nim:

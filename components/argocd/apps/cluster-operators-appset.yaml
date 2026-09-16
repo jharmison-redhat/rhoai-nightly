@@ -15,6 +15,9 @@ spec:
         revision: cluster/nga
         directories:
           - path: components/operators/*
+          # cert-manager is owned by the cluster's openshift-setup Application.
+          - path: components/operators/cert-manager
+            exclude: true
   template:
     metadata:
       name: "{{path.basename}}"

@@ -18,7 +18,7 @@
 # Models:
 #   auto              (default) Inspect cluster and pick the best-fit model:
 #                       no GPU nodes             -> simulator
-#                       GPU VRAM >= 40 GiB       -> gpt-oss-20b
+#                       GPU VRAM >= 40 GiB       -> qwen3-6-27b-fp8
 #                       otherwise                -> granite-tiny-gpu
 #                     VRAM is read from the `nvidia.com/gpu.memory` label set by
 #                     the NVIDIA GPU operator's node feature discovery (~3-5 min
@@ -26,7 +26,7 @@
 #                     yet, falls back to granite-tiny-gpu with a warning.
 #   simulator         CPU-only mock (~256Mi RAM, no real LLM)
 #   granite-tiny-gpu  RedHatAI Granite 4.0-h-tiny FP8 on vLLM GPU
-#   gpt-oss-20b       OpenAI gpt-oss-20b on vLLM GPU
+#   qwen3-6-27b-fp8   Red Hat AI Qwen3-6-27B FP8 on vLLM GPU
 #   all               Deploy all models
 #
 # Options:
@@ -69,21 +69,21 @@ while [[ $# -gt 0 ]]; do
 Usage: setup-maas-model.sh [OPTIONS] [MODEL...]
 
 Deploy sample models with MaaS access and rate limits.
-Each model gets free tier (100 tokens/min) and premium tier (10000 tokens/min).
+Each model gets free tier (100 tokens/min) and premium tier (100000 tokens/min).
 
 Models:
   auto              (default) Pick a model based on cluster GPU capacity.
                       no GPU           -> simulator
-                      GPU VRAM >= 40Gi -> gpt-oss-20b
+                      GPU VRAM >= 40Gi -> qwen3-6-27b-fp8
                       otherwise        -> granite-tiny-gpu
   simulator         CPU-only mock (~256Mi RAM, no real LLM)
   granite-tiny-gpu  RedHatAI Granite 4.0-h-tiny FP8 on vLLM GPU
-  gpt-oss-20b       OpenAI gpt-oss-20b on vLLM GPU
+  qwen3-6-27b-fp8   Red Hat AI Qwen3-6-27B FP8 on vLLM GPU
   all               Deploy all models
 
 Config:
   Set MAAS_MODELS in .env to override the autodetect default:
-    MAAS_MODELS=gpt-oss-20b granite-tiny-gpu
+    MAAS_MODELS=qwen3-6-27b-fp8 granite-tiny-gpu
 
 Options:
   --delete        Delete the model(s) instead of deploying
@@ -93,9 +93,9 @@ Options:
 Examples:
   ./setup-maas-model.sh                            # Autodetect (or MAAS_MODELS)
   ./setup-maas-model.sh auto                       # Same; explicit
-  ./setup-maas-model.sh simulator gpt-oss-20b      # Deploy specific models
+  ./setup-maas-model.sh simulator qwen3-6-27b-fp8  # Deploy specific models
   ./setup-maas-model.sh all                        # Deploy all models
-  ./setup-maas-model.sh --delete gpt-oss-20b       # Remove one model
+  ./setup-maas-model.sh --delete qwen3-6-27b-fp8   # Remove one model
   ./setup-maas-model.sh --delete all               # Remove all models
   ./setup-maas-model.sh --status                   # Show deployed model status
 EOF
@@ -103,7 +103,7 @@ EOF
             ;;
         -*) log_error "Unknown option: $1"; exit 1 ;;
         *)
-            # Collect all positional args as models (supports: simulator gpt-oss-20b)
+            # Collect all positional args as models (supports: simulator qwen3-6-27b-fp8)
             if [ "$MODEL" = "${MAAS_MODELS:-auto}" ] && [ -z "${POSITIONAL_SET:-}" ]; then
                 MODEL="$1"
                 POSITIONAL_SET=true
@@ -139,7 +139,7 @@ autodetect_model() {
     if [[ -z "$max_mib" ]]; then
         log_warn "Autodetect: $gpu_count GPU node(s) present but nvidia.com/gpu.memory label not found yet" >&2
         log_warn "           (GPU operator feature discovery may still be catching up)" >&2
-        log_warn "           Falling back to granite-tiny-gpu — override with MAAS_MODELS=gpt-oss-20b if your GPUs are >=40 GiB" >&2
+        log_warn "           Falling back to granite-tiny-gpu — override with MAAS_MODELS=qwen3-6-27b-fp8 if your GPUs are >=40 GiB" >&2
         echo granite-tiny-gpu
         return
     fi
@@ -150,8 +150,8 @@ autodetect_model() {
         -o jsonpath='{.items[0].metadata.labels.nvidia\.com/gpu\.product}' 2>/dev/null || echo "unknown")
 
     if (( max_mib >= 40960 )); then
-        log_info "Autodetect: largest GPU ${gpu_product} @ ${max_gib} GiB VRAM (>=40 GiB) -> gpt-oss-20b" >&2
-        echo gpt-oss-20b
+        log_info "Autodetect: largest GPU ${gpu_product} @ ${max_gib} GiB VRAM (>=40 GiB) -> qwen3-6-27b-fp8" >&2
+        echo qwen3-6-27b-fp8
     else
         log_info "Autodetect: largest GPU ${gpu_product} @ ${max_gib} GiB VRAM (<40 GiB) -> granite-tiny-gpu" >&2
         echo granite-tiny-gpu
@@ -167,8 +167,8 @@ resolve_single_model() {
         simulator)
             echo "$MODELS_DIR/simulator"
             ;;
-        gpt-oss-20b|gpt-oss)
-            echo "$MODELS_DIR/gpt-oss-20b"
+        qwen3-6-27b-fp8|qwen3|qwen)
+            echo "$MODELS_DIR/qwen3-6-27b-fp8"
             ;;
         granite-tiny-gpu|granite-tiny|granite)
             echo "$MODELS_DIR/granite-tiny-gpu"
@@ -242,7 +242,7 @@ log_info "Connected to: $(oc whoami --show-server)"
 # Use bash parameter expansion (not sed \b) for portability — BSD sed on macOS
 # doesn't understand \b word boundaries and would silently no-op the rewrite.
 # Safe: 'auto' is not a substring of any other valid model name (simulator,
-# granite-tiny-gpu, gpt-oss-20b, all).
+# granite-tiny-gpu, qwen3-6-27b-fp8, all).
 if [[ " $MODEL " == *" auto "* ]]; then
     RESOLVED=$(autodetect_model)
     MODEL="${MODEL//auto/$RESOLVED}"
@@ -254,7 +254,7 @@ MODEL_PATHS=$(resolve_model_paths "$MODEL") || exit 1
 # Check for GPU requirement
 for path in $MODEL_PATHS; do
     model_name=$(basename "$path")
-    if [[ "$model_name" == *gpu* ]]; then
+    if grep -rq "nvidia.com/gpu" "$path" 2>/dev/null; then
         GPU_NODES=$(oc get nodes -l nvidia.com/gpu.present=true --no-headers 2>/dev/null | wc -l | tr -d ' ')
         if [ "$GPU_NODES" = "0" ]; then
             log_warn "$model_name requires GPU nodes but none found with nvidia.com/gpu.present=true"

@@ -361,21 +361,6 @@ oc delete pod  -n openshift-operators -l control-plane=controller-manager,app=ku
 `install-maas.sh` auto-remedies the Kuadrant case (waits for the AuthPolicy
 condition to materialize, then bounces the pod on the known message).
 
-### E2. `make maas-model` times out on gpt-oss-20b (cold image cache)
-
-The wait budget (900s) is shorter than a cold pull + vLLM load (~18 min: two
-large images then engine init). If there's no CrashLoop/ImagePull error it's
-just slow — watch `oc get pods -n llm -w` to 2/2. Candidate fix: raise the GPU
-timeout in `scripts/setup-maas-model.sh` to ~1500s. (2026-08-05 g767p: script
-exited 0 at ~17 min with the pod still 1/2 — vLLM finished loading ~4 min
-later; the hazard is now "script declares done before the model serves" rather
-than a hard timeout.) **Reproduced identically 2026-08-14** (bq4x2, L40S):
-exit 0 at ~17 min with the pod at 1/2 and the MaaSModelRef reporting
-`Unhealthy`; serving ~4 min later. Two runs on different clusters now agree on
-the shape, which strengthens the case for the ~1500s fix.
-
----
-
 ## F. Defects in this repo's own scripts
 
 ### F1. `make sync` blanket-approves EVERY pending InstallPlan in `openshift-operators`

@@ -102,7 +102,7 @@ rhoai-nightly/
 │       ├── external-secrets-instance/   # External Secrets instance config
 │       └── maas-models/                # MaaS model manifests (kustomize)
 │           ├── simulator/              # CPU-only mock model
-│           ├── gpt-oss-20b/            # OpenAI gpt-oss-20b (GPU, vLLM CUDA)
+│           ├── qwen3-6-27b-fp8/        # Red Hat AI Qwen3-6-27B FP8 (GPU, RHAIIS)
 │           └── granite-tiny-gpu/       # Granite 4.0-h-tiny FP8 (GPU, vLLM CUDA)
 │
 ├── Makefile                             # Automation targets
@@ -235,10 +235,10 @@ make maas            # Install MaaS platform ONLY (secrets, ArgoCD app, Authorin
                      # Does NOT install the observability cascade — run `make observability`
                      # separately once the cluster is healthy.
 make maas-model      # Deploy models (default: auto — inspects cluster GPU VRAM)
-                     # Autodetect rules: no GPU -> simulator; GPU VRAM >=40Gi -> gpt-oss-20b;
+                     # Autodetect rules: no GPU -> simulator; GPU VRAM >=40Gi -> qwen3-6-27b-fp8;
                      # otherwise -> granite-tiny-gpu
                      # Override: make maas-model MODEL=simulator
-                     # Or set MAAS_MODELS in .env: MAAS_MODELS=gpt-oss-20b granite-tiny-gpu
+                     # Or set MAAS_MODELS in .env: MAAS_MODELS=qwen3-6-27b-fp8 granite-tiny-gpu
 make maas-model-status # Show deployed model status
 make maas-model-delete # Delete models (same MODEL= or MAAS_MODELS logic)
 make maas-verify     # Full end-to-end verification (deploys temp model, tests, cleans up)
@@ -251,7 +251,7 @@ make observability-uninstall # Reverse-flip instance-rhoai to overlays/maas; mon
 
 Available models:
 - `simulator` — CPU-only mock (~256Mi RAM, no real LLM)
-- `gpt-oss-20b` — OpenAI gpt-oss-20b on vLLM GPU (1 GPU, 60Gi RAM)
+- `qwen3-6-27b-fp8` — Red Hat AI Qwen3-6-27B FP8 on RHAIIS 3.5.1 (1 L40S-class GPU, 60Gi RAM)
 - `granite-tiny-gpu` — RedHatAI Granite 4.0-h-tiny FP8 on vLLM GPU (1 GPU, 24Gi RAM)
 
 Each model gets free tier (100 tokens/min, all authenticated users) and premium tier (100000 tokens/min, all authenticated users).
@@ -591,7 +591,7 @@ Models are defined as kustomize manifests in `components/instances/maas-models/`
 - `llm/` — LLMInferenceService (the workload)
 - `maas/` — MaaSModelRef + MaaSAuthPolicy + MaaSSubscription (free + premium tiers)
 
-`setup-maas-model.sh` deploys/deletes models using `oc kustomize`. It reads `MAAS_MODELS` from `.env` for model selection (default: **`auto`** — the script inspects GPU VRAM and picks simulator / granite-tiny-gpu / gpt-oss-20b).
+`setup-maas-model.sh` deploys/deletes models using `oc kustomize`. It reads `MAAS_MODELS` from `.env` for model selection (default: **`auto`** — the script inspects GPU VRAM and picks simulator / granite-tiny-gpu / qwen3-6-27b-fp8).
 
 ### MaaS Verification
 
@@ -853,7 +853,7 @@ Expected wait times for each script:
 - `evalhub`: ~3-5 minutes (lightweight settle-gate, creates instance-evalhub Application, waits for EvalHub Ready + MLflow + DSPA + evalhub-tenant). Orthogonal to MaaS / observability.
 - `evalhub-uninstall`: ~30 seconds (deletes instance-evalhub Application; resources-finalizer cascade-prunes EvalHub/MLflow/DSPA + evalhub-tenant ns).
 - `maas-model` (simulator): ~30 seconds (CPU, no image pull needed after first time)
-- `maas-model` (GPU models): ~18-20 minutes. NOTE: the script exits 0 at ~17 min while the pod is still 1/2 and MaaSModelRef reports Unhealthy — vLLM finishes ~4 min later. Poll `oc get pods -n llm` to 2/2 before verifying (workarounds.md §E2)
+- `maas-model` (GPU models): startup depends on image cache and model size. Poll `oc get pods -n llm` to 2/2 before verifying.
 - `maas-verify`: ~3 minutes (deploys temp model, runs tests, cleans up)
 - `maas-uninstall`: ~30 seconds (deletes ArgoCD app + secrets)
 

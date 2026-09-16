@@ -33,7 +33,6 @@ SYNC_ORDER=(
     "instance-nvidia"
 
     # Phase 2: Dependent Operators
-    "cert-manager"                # Required by jobset-operator, kueue, trainer
     "kueue-operator"
     "leader-worker-set"
     "instance-lws"
@@ -148,7 +147,6 @@ get_operator_csv_info() {
         nfs-provisioner)        echo "nfs-provisioner-operator|nfs-provisioner" ;;
         nfd)                    echo "nfd|openshift-nfd" ;;
         nvidia-operator)        echo "gpu-operator-certified|nvidia-gpu-operator" ;;
-        cert-manager)           echo "cert-manager-operator|cert-manager-operator" ;;
         kueue-operator)         echo "kueue-operator|openshift-kueue-operator" ;;
         leader-worker-set)      echo "leader-worker-set|openshift-lws-operator" ;;
         jobset-operator)        echo "jobset-operator|openshift-jobset-operator" ;;

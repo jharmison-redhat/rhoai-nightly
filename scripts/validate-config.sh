@@ -139,7 +139,7 @@ get_gpu_specs() {
 get_model_requirements() {
     case "$1" in
         simulator)        echo "0|0|1|CPU-only mock model" ;;
-        gpt-oss-20b)      echo "1|16|60|OpenAI gpt-oss-20b on vLLM CUDA" ;;
+        qwen3-6-27b-fp8)  echo "1|16|60|Red Hat AI Qwen3-6-27B FP8 on vLLM CUDA" ;;
         granite-tiny-gpu)  echo "1|8|24|Granite 4.0-h-tiny FP8 on vLLM CUDA" ;;
         *)                echo "0|0|0|Unknown model" ;;
     esac
@@ -197,11 +197,11 @@ fi
 # Get configured models
 MAAS_MODELS_CONFIGURED="${MAAS_MODELS:-}"
 if [[ -z "$MAAS_MODELS_CONFIGURED" ]]; then
-    ALL_MODELS="gpt-oss-20b"
+    ALL_MODELS="qwen3-6-27b-fp8"
     info "MAAS_MODELS" "Not set — default: $ALL_MODELS"
     MAAS_MODELS_CONFIGURED="$ALL_MODELS"
 elif [[ "$MAAS_MODELS_CONFIGURED" == "all" ]]; then
-    ALL_MODELS="gpt-oss-20b granite-tiny-gpu"
+    ALL_MODELS="qwen3-6-27b-fp8 granite-tiny-gpu"
     info "MAAS_MODELS" "all ($ALL_MODELS)"
     MAAS_MODELS_CONFIGURED="$ALL_MODELS"
 else

@@ -241,10 +241,10 @@ make maas-model 2>&1 | tee $LOGDIR/phase10-maas-model.log
 
 `make maas-model` autodetects which model fits:
 - no GPU nodes → simulator
-- GPU `nvidia.com/gpu.memory` ≥ 40 GiB → gpt-oss-20b
+- GPU `nvidia.com/gpu.memory` ≥ 40 GiB → qwen3-6-27b-fp8
 - otherwise → granite-tiny-gpu
 
-**Do not hardcode model recommendations in this skill** — the script is the source of truth. If the autodetect returned granite-tiny-gpu on a cluster where you expected gpt-oss-20b, most likely cause is the GPU operator hasn't populated the `nvidia.com/gpu.memory` label yet (lag ~3-5 min after node Ready). The script emits a warning in that case and falls back to granite-tiny-gpu.
+**Do not hardcode model recommendations in this skill** — the script is the source of truth. If the autodetect returned granite-tiny-gpu on a cluster where you expected qwen3-6-27b-fp8, most likely cause is the GPU operator hasn't populated the `nvidia.com/gpu.memory` label yet (lag ~3-5 min after node Ready). The script emits a warning in that case and falls back to granite-tiny-gpu.
 
 Verify: `oc get llminferenceservice -n llm` Ready=True for the deployed model; `oc get maasmodelref -n llm` Ready; model pod Running in `llm` namespace.
 

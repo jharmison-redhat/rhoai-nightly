@@ -1,14 +1,14 @@
 apiVersion: maas.opendatahub.io/v1alpha1
 kind: MaaSAuthPolicy
 metadata:
-  name: gpt-oss-20b-access
+  name: qwen3-6-27b-fp8-access
   namespace: models-as-a-service
   annotations:
-    openshift.io/display-name: "gpt-oss-20b Access"
-    openshift.io/description: "Grants all authenticated users access to gpt-oss-20b"
+    openshift.io/display-name: "Qwen3-6-27B FP8 Access"
+    openshift.io/description: "Grants all authenticated users access to qwen3-6-27b-fp8"
 spec:
   modelRefs:
-    - name: gpt-oss-20b
+    - name: qwen3-6-27b-fp8
       namespace: llm
   subjects:
     groups:

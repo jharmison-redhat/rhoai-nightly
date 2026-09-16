@@ -3,7 +3,7 @@
 # Model weights: OCI modelcar from registry.redhat.io
 # Runtime: Red Hat AI Inference Server (vLLM CUDA)
 # Requires: nvidia.com/gpu node, ~8GB GPU memory
-apiVersion: serving.kserve.io/v1alpha1
+apiVersion: serving.kserve.io/v1alpha2
 kind: LLMInferenceService
 metadata:
   name: granite-4-tiny-gpu

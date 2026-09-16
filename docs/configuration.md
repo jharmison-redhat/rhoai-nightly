@@ -77,7 +77,7 @@ commit it. The Makefile sources it automatically.
 | `CPU_INSTANCE_TYPE` | `m6a.4xlarge` | CPU worker MachineSet instance type |
 | `CPU_VOLUME_SIZE` | `120` | CPU worker root volume (GB) |
 | `CPU_MIN` / `CPU_MAX` | `1` / `3` | CPU autoscaler bounds |
-| `MAAS_MODELS` | `auto` | Models to deploy (`auto`, `simulator`, `gpt-oss-20b`, `granite-tiny-gpu`, `all`, or a space-separated list) |
+| `MAAS_MODELS` | `auto` | Models to deploy (`auto`, `simulator`, `qwen3-6-27b-fp8`, `granite-tiny-gpu`, `all`, or a space-separated list) |
 | `GITOPS_REPO_URL` / `GITOPS_BRANCH` | this repo / `main` | Repo + branch ArgoCD syncs from (see below) |
 
 Validate your `.env` against the live cluster:

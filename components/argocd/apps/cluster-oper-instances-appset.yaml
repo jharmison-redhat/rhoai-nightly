@@ -79,8 +79,8 @@ spec:
           jsonPointers:
             - /spec/driver/licensingConfig/secretName
       source:
-        repoURL: https://github.com/rh-aiservices-bu/rhoai-nightly
-        targetRevision: main
+        repoURL: https://github.com/jharmison-redhat/rhoai-nightly
+        targetRevision: cluster/nga
         path: "{{values.path}}"
       destination:
         server: https://kubernetes.default.svc

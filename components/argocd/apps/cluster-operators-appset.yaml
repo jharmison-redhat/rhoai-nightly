@@ -11,8 +11,8 @@ spec:
     applicationsSync: create-only
   generators:
     - git:
-        repoURL: https://github.com/rh-aiservices-bu/rhoai-nightly
-        revision: main
+        repoURL: https://github.com/jharmison-redhat/rhoai-nightly
+        revision: cluster/nga
         directories:
           - path: components/operators/*
   template:
@@ -27,8 +27,8 @@ spec:
           jsonPointers:
             - /spec/installPlanApproval
       source:
-        repoURL: https://github.com/rh-aiservices-bu/rhoai-nightly
-        targetRevision: main
+        repoURL: https://github.com/jharmison-redhat/rhoai-nightly
+        targetRevision: cluster/nga
         path: "{{path}}"
       destination:
         server: https://kubernetes.default.svc

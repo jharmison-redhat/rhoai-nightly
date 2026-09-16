@@ -150,7 +150,7 @@ make maas-model 2>&1 | tee $LOGDIR/phase2-maas-model.log
 
 `setup-maas-model.sh` autodetects which model fits based on `nvidia.com/gpu.memory` labels:
 - no GPU → simulator
-- GPU VRAM ≥ 40 GiB (L40S, A100-40, H100, etc.) → gpt-oss-20b
+- GPU VRAM ≥ 40 GiB (L40S, A100-80, H100, etc.) → qwen3-6-27b-fp8
 - GPU VRAM < 40 GiB (T4, L4, A10, etc.) → granite-tiny-gpu
 
 **Do not hardcode recommendations in this skill.** The script is the source of truth. To override, the user sets `MAAS_MODELS=...` inline or in .env (accepting a space-separated list).
@@ -164,7 +164,7 @@ oc get llminferenceservice -n llm
 oc get maasmodelref -n llm -o custom-columns='NAME:.metadata.name,PHASE:.status.phase'
 ```
 
-GPU models take ~18-20 min (image pull ~8GB + vLLM model load). Non-GPU simulator is ~30 sec. NOTE: `make maas-model` exits 0 at ~17 min while the pod is still 1/2 and MaaSModelRef reports Unhealthy — exit 0 does NOT mean serving. Poll `oc get pods -n llm` to 2/2 before running any verification (workarounds.md §E2).
+GPU model startup depends on image cache and model size; the Qwen modelcar is approximately 31GB. Non-GPU simulator is ~30 sec. Poll `oc get pods -n llm` to 2/2 before running any verification.
 
 Verify after completion:
 - LLMInferenceService Ready=True

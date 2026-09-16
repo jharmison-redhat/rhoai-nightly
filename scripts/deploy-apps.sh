@@ -221,10 +221,23 @@ done
 echo ""
 log_info "All ${#EXPECTED_APPS[@]} apps created!"
 
-# Step 8: Patch all generated apps with correct repo/branch
-# ApplicationSets use create-only policy, so existing apps need direct patching
-log_step "Patching all apps with repo/branch..."
-for app in $(oc get applications.argoproj.io -n openshift-gitops -o name | grep -v cluster-config); do
+# Step 8: Patch only RHOAI-owned apps with correct repo/branch.
+# Other GitOps stacks share this ArgoCD namespace.
+log_step "Patching RHOAI apps with repo/branch..."
+for app in $(oc get applications.argoproj.io -n openshift-gitops -o json | jq -r '
+    .items[]
+    | select(
+        .metadata.name == "instance-maas"
+        or .metadata.name == "instance-maas-observability"
+        or .metadata.name == "instance-evalhub"
+        or ((.metadata.ownerReferences // []) | any(
+            .kind == "ApplicationSet"
+            and (.name == "cluster-operators-applicationset" or .name == "cluster-oper-instances-applicationset")
+        ))
+    )
+    | select(.metadata.name != "cert-manager")
+    | "application.argoproj.io/" + .metadata.name
+'); do
     oc patch "$app" -n openshift-gitops --type=merge -p "{
         \"spec\": {
             \"source\": {
@@ -234,7 +247,7 @@ for app in $(oc get applications.argoproj.io -n openshift-gitops -o name | grep 
         }
     }" 2>/dev/null || true
 done
-log_info "All apps patched with: $REPO_URL @ $BRANCH"
+log_info "RHOAI apps patched with: $REPO_URL @ $BRANCH"
 log_info ""
 log_info "Apps are deployed with sync DISABLED."
 log_info "Run 'make sync' to sync apps in dependency order."

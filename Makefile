@@ -67,10 +67,10 @@ help:
 	@echo "  make maas           - Install MaaS platform (PostgreSQL+PVC, Gateway, Authorino TLS)"
 	@echo "                        Does NOT install the observability cascade — run 'make observability'"
 	@echo "                        separately once the cluster is healthy (settle-gate protects masters)."
-	@echo "  make maas-model [MODEL=auto] - Deploy model (auto, gpt-oss-20b, granite-tiny-gpu, simulator, all)"
-	@echo "                                 Default 'auto' picks by GPU VRAM: >=40Gi->gpt-oss-20b, GPU<40Gi->granite-tiny-gpu, no GPU->simulator"
+	@echo "  make maas-model [MODEL=auto] - Deploy model (auto, qwen3-6-27b-fp8, granite-tiny-gpu, simulator, all)"
+	@echo "                                 Default 'auto' picks by GPU VRAM: >=40Gi->qwen3-6-27b-fp8, GPU<40Gi->granite-tiny-gpu, no GPU->simulator"
 	@echo "  make maas-model-status - Show deployed model status"
-	@echo "  make maas-model-delete [MODEL=gpt-oss-20b] - Remove a deployed model"
+	@echo "  make maas-model-delete [MODEL=qwen3-6-27b-fp8] - Remove a deployed model"
 	@echo "  make maas-verify    - Verify MaaS (deploy simulator, test API, auth, rate limits)"
 	@echo "  make maas-uninstall - Remove MaaS resources created by install-maas.sh"
 	@echo "  make observability  - (Re-)install MaaS observability only (UWM + monitors + Kuadrant)"
@@ -273,8 +273,8 @@ dedicate-masters:
 maas:
 	@scripts/install-maas.sh
 
-# Deploy MaaS model(s) (default: gpt-oss-20b, or MAAS_MODELS from .env)
-# Usage: make maas-model [MODEL=gpt-oss-20b|granite-tiny-gpu|simulator|all]
+# Deploy MaaS model(s) (default: auto, or MAAS_MODELS from .env)
+# Usage: make maas-model [MODEL=qwen3-6-27b-fp8|granite-tiny-gpu|simulator|all]
 maas-model:
 	@scripts/setup-maas-model.sh $(or $(MODEL),)
 
@@ -283,7 +283,7 @@ maas-model-status:
 	@scripts/setup-maas-model.sh --status
 
 # Delete deployed MaaS model(s)
-# Usage: make maas-model-delete [MODEL=gpt-oss-20b|granite-tiny-gpu|simulator|all]
+# Usage: make maas-model-delete [MODEL=qwen3-6-27b-fp8|granite-tiny-gpu|simulator|all]
 maas-model-delete:
 	@scripts/setup-maas-model.sh --delete $(or $(MODEL),)
 
@@ -315,4 +315,3 @@ evalhub: ## Enable eval-hub (EvalHub + MLflow + DSPA in evalhub-tenant ns)
 evalhub-uninstall: ## Disable eval-hub (deletes Application)
 	@chmod +x scripts/install-evalhub.sh
 	@scripts/install-evalhub.sh --uninstall
-

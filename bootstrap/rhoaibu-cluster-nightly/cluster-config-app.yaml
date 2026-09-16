@@ -6,8 +6,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/rh-aiservices-bu/rhoai-nightly
-    targetRevision: main
+    repoURL: https://github.com/jharmison-redhat/rhoai-nightly
+    targetRevision: cluster/nga
     path: clusters/overlays/rhoaibu-cluster-nightly
   destination:
     server: https://kubernetes.default.svc

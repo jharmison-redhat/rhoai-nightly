@@ -43,10 +43,10 @@ From Claude Code: `/install-maas` (see [Install with Claude](install-claude.md))
 ```bash
 make maas-model                         # auto-detect by cluster GPU VRAM:
                                         #   no GPU           -> simulator
-                                        #   GPU VRAM >= 40Gi -> gpt-oss-20b
+                                        #   GPU VRAM >= 40Gi -> qwen3-6-27b-fp8
                                         #   otherwise        -> granite-tiny-gpu
 make maas-model MODEL=simulator         # CPU-only mock
-make maas-model MODEL=gpt-oss-20b       # GPU
+make maas-model MODEL=qwen3-6-27b-fp8   # GPU
 make maas-model MODEL=granite-tiny-gpu  # GPU
 make maas-model MODEL=all               # all of the above
 ```
@@ -56,7 +56,7 @@ Available models:
 | Model | Hardware | Notes |
 |-------|----------|-------|
 | **simulator** | CPU only | ~256Mi RAM, instant startup, mock responses |
-| **gpt-oss-20b** | 1 GPU | OpenAI gpt-oss-20b on vLLM CUDA, 60Gi RAM, 5–15 min startup |
+| **qwen3-6-27b-fp8** | 1 L40S-class GPU | Red Hat AI Qwen3-6-27B FP8 on RHAIIS 3.5.1, 128K context, 60Gi RAM |
 | **granite-tiny-gpu** | 1 GPU | RedHatAI Granite 4.0-h-tiny FP8 on vLLM CUDA, 24Gi RAM |
 
 Each model gets two subscription tiers (all authenticated users):
@@ -67,7 +67,7 @@ Each model gets two subscription tiers (all authenticated users):
 Set defaults in `.env`:
 
 ```bash
-MAAS_MODELS=gpt-oss-20b granite-tiny-gpu
+MAAS_MODELS=qwen3-6-27b-fp8 granite-tiny-gpu
 ```
 
 ## Manage models

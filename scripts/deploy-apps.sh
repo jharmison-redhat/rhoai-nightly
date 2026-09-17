@@ -192,7 +192,45 @@ oc patch applicationset cluster-oper-instances-applicationset -n openshift-gitop
 ]"
 log_info "Patched cluster-oper-instances-applicationset"
 
-# Step 7: Wait for all expected apps to be created
+# Step 7: Create cert-manager only when it is not externally managed.
+CERT_MANAGER_APP_CREATED=false
+if ! CERT_MANAGER_APP=$(oc get application.argoproj.io/cert-manager -n openshift-gitops --ignore-not-found -o name 2>/dev/null); then
+    log_warn "Could not inspect Application/cert-manager; leaving cert-manager untouched"
+elif ! CERT_MANAGER_SUBSCRIPTIONS=$(oc get subscriptions.operators.coreos.com -A -o jsonpath='{range .items[?(@.spec.name=="openshift-cert-manager-operator")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null); then
+    log_warn "Could not inspect cert-manager Subscriptions; leaving cert-manager untouched"
+elif ! CERT_MANAGER_OPERATOR_GROUP=$(oc get operatorgroup.operators.coreos.com/cert-manager-operator-og -n cert-manager-operator --ignore-not-found -o name 2>/dev/null); then
+    log_warn "Could not inspect OperatorGroup/cert-manager-operator-og; leaving cert-manager untouched"
+elif [[ -n "$CERT_MANAGER_APP" || -n "$CERT_MANAGER_SUBSCRIPTIONS" || -n "$CERT_MANAGER_OPERATOR_GROUP" ]]; then
+    log_warn "Existing cert-manager resources found; leaving cert-manager untouched"
+else
+    log_step "Creating cert-manager Application (sync disabled)..."
+    oc apply -f - <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: openshift-gitops
+spec:
+  project: default
+  syncPolicy: {}
+  ignoreDifferences:
+    - group: operators.coreos.com
+      kind: Subscription
+      jsonPointers:
+        - /spec/installPlanApproval
+  source:
+    repoURL: $REPO_URL
+    targetRevision: $BRANCH
+    path: components/operators/cert-manager
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+EOF
+    CERT_MANAGER_APP_CREATED=true
+    log_info "cert-manager app created (sync disabled)"
+fi
+
+# Step 8: Wait for all expected apps to be created
 EXPECTED_APPS=(
     "nfd" "instance-nfd"
     "nvidia-operator" "instance-nvidia"
@@ -202,6 +240,9 @@ EXPECTED_APPS=(
     "connectivity-link" "instance-kuadrant"
     "rhoai-operator" "instance-rhoai"
 )
+if [[ "$CERT_MANAGER_APP_CREATED" == "true" ]]; then
+    EXPECTED_APPS+=("cert-manager")
+fi
 
 log_step "Waiting for apps to be created..."
 APP_WAIT_TIMEOUT=120
@@ -221,10 +262,10 @@ done
 echo ""
 log_info "All ${#EXPECTED_APPS[@]} apps created!"
 
-# Step 8: Patch all generated apps with correct repo/branch
+# Step 9: Patch all generated apps with correct repo/branch
 # ApplicationSets use create-only policy, so existing apps need direct patching
 log_step "Patching all apps with repo/branch..."
-for app in $(oc get applications.argoproj.io -n openshift-gitops -o name | grep -v cluster-config); do
+for app in $(oc get applications.argoproj.io -n openshift-gitops -o name | grep -Ev 'cluster-config|cert-manager'); do
     oc patch "$app" -n openshift-gitops --type=merge -p "{
         \"spec\": {
             \"source\": {

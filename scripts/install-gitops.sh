@@ -30,35 +30,58 @@ fi
 
 log_info "Connected to: $(oc whoami --show-server)"
 
-# Step 1: Apply GitOps operator subscription
-log_step "Installing OpenShift GitOps operator..."
-oc apply -k "$REPO_ROOT/bootstrap/gitops-operator/"
-
-# Step 2: Wait for Operator CSV to succeed
-log_step "Waiting for GitOps operator to install (this may take 2-3 minutes)..."
-TIMEOUT=300
-INTERVAL=10
-ELAPSED=0
-
-while [[ $ELAPSED -lt $TIMEOUT ]]; do
-    CSV=$(oc get csv -n openshift-gitops-operator -o name 2>/dev/null | grep gitops || true)
-    if [[ -n "$CSV" ]]; then
-        PHASE=$(oc get "$CSV" -n openshift-gitops-operator -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-        if [[ "$PHASE" == "Succeeded" ]]; then
-            log_info "GitOps operator installed successfully"
-            break
-        fi
-        log_info "Operator CSV phase: $PHASE"
-    else
-        log_info "Waiting for operator CSV..."
+# Discover existing GitOps resources before changing the cluster.
+if GITOPS_SUBSCRIPTIONS=$(oc get subscriptions -A -o jsonpath='{range .items[?(@.spec.name=="openshift-gitops-operator")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>&1); then
+    if [[ -n "$GITOPS_SUBSCRIPTIONS" ]]; then
+        log_warn "Existing OpenShift GitOps subscription(s): ${GITOPS_SUBSCRIPTIONS//$'\n'/, }"
     fi
-    sleep $INTERVAL
-    ELAPSED=$((ELAPSED + INTERVAL))
-done
+else
+    log_warn "Could not determine whether an OpenShift GitOps subscription exists: $GITOPS_SUBSCRIPTIONS"
+    GITOPS_SUBSCRIPTIONS=""
+fi
 
-if [[ $ELAPSED -ge $TIMEOUT ]]; then
-    log_error "Timeout waiting for GitOps operator"
-    exit 1
+if ARGOCDS=$(oc get argocds.argoproj.io -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>&1); then
+    if [[ -n "$ARGOCDS" ]]; then
+        log_warn "Existing ArgoCD CR(s): ${ARGOCDS//$'\n'/, }; assuming usable and skipping GitOps bootstrap"
+        exit 0
+    fi
+else
+    log_warn "Could not determine whether ArgoCD CRs exist; continuing with fresh bootstrap path: $ARGOCDS"
+fi
+
+# Step 1: Apply GitOps operator subscription when no matching subscription exists.
+if [[ -z "$GITOPS_SUBSCRIPTIONS" ]]; then
+    log_step "Installing OpenShift GitOps operator..."
+    oc apply -k "$REPO_ROOT/bootstrap/gitops-operator/"
+
+    # Step 2: Wait for Operator CSV to succeed
+    log_step "Waiting for GitOps operator to install (this may take 2-3 minutes)..."
+    TIMEOUT=300
+    INTERVAL=10
+    ELAPSED=0
+
+    while [[ $ELAPSED -lt $TIMEOUT ]]; do
+        CSV=$(oc get csv -n openshift-gitops-operator -o name 2>/dev/null | grep gitops || true)
+        if [[ -n "$CSV" ]]; then
+            PHASE=$(oc get "$CSV" -n openshift-gitops-operator -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+            if [[ "$PHASE" == "Succeeded" ]]; then
+                log_info "GitOps operator installed successfully"
+                break
+            fi
+            log_info "Operator CSV phase: $PHASE"
+        else
+            log_info "Waiting for operator CSV..."
+        fi
+        sleep $INTERVAL
+        ELAPSED=$((ELAPSED + INTERVAL))
+    done
+
+    if [[ $ELAPSED -ge $TIMEOUT ]]; then
+        log_error "Timeout waiting for GitOps operator"
+        exit 1
+    fi
+else
+    log_warn "Skipping GitOps subscription and CSV wait; existing subscription will not be changed"
 fi
 
 # Step 3: Wait for openshift-gitops namespace
@@ -73,10 +96,35 @@ done
 
 # Step 4: Apply ArgoCD instance configuration
 log_step "Configuring ArgoCD instance..."
-until oc apply -k "$REPO_ROOT/bootstrap/argocd-instance/" 2>/dev/null; do
-    log_info "Waiting for ArgoCD CRDs... retrying in 5s"
-    sleep 5
-done
+SKIP_CLUSTER_ADMIN_BINDING=false
+SKIP_GITOPS_ADMINS_GROUP=false
+if CRB=$(oc get clusterrolebinding argocd-cluster-admin --ignore-not-found -o name 2>&1); then
+    if [[ -n "$CRB" ]]; then
+        log_warn "Existing ClusterRoleBinding argocd-cluster-admin; skipping its configuration"
+        SKIP_CLUSTER_ADMIN_BINDING=true
+    fi
+else
+    log_warn "Could not determine whether ClusterRoleBinding argocd-cluster-admin exists; skipping its configuration: $CRB"
+    SKIP_CLUSTER_ADMIN_BINDING=true
+fi
+if GROUP=$(oc get group gitops-admins --ignore-not-found -o name 2>&1); then
+    if [[ -n "$GROUP" ]]; then
+        log_warn "Existing Group gitops-admins; skipping its configuration"
+        SKIP_GITOPS_ADMINS_GROUP=true
+    fi
+else
+    log_warn "Could not determine whether Group gitops-admins exists; skipping its configuration: $GROUP"
+    SKIP_GITOPS_ADMINS_GROUP=true
+fi
+
+if [[ "$SKIP_CLUSTER_ADMIN_BINDING" == true || "$SKIP_GITOPS_ADMINS_GROUP" == true ]]; then
+    log_warn "Skipping ArgoCD instance configuration to avoid changing existing bootstrap resources"
+else
+    until oc apply -k "$REPO_ROOT/bootstrap/argocd-instance/" 2>/dev/null; do
+        log_info "Waiting for ArgoCD CRDs... retrying in 5s"
+        sleep 5
+    done
+fi
 
 # Step 5: Wait for ArgoCD Server to be available
 log_step "Waiting for ArgoCD server to be ready..."

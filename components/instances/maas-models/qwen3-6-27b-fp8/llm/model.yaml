@@ -49,6 +49,10 @@ spec:
           - --tool-call-parser=qwen3_coder
           - --enable-prefix-caching
           - --language-model-only
+          - --gpu-memory-utilization=0.95
+          - --kv-cache-dtype=fp8
+          - --max-num-seqs=8
+          - --max-num-batched-tokens=4096
         ports:
           - containerPort: 8000
             name: http

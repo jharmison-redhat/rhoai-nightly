@@ -77,7 +77,6 @@ MANAGED_NAMESPACES=(
     "openshift-kueue-operator"
     "openshift-lws-operator"
     "openshift-jobset-operator"
-    "cert-manager-operator"
     "nfs-provisioner"
 )
 
@@ -137,7 +136,6 @@ OPERATOR_NAMESPACES=(
     "openshift-jobset-operator"
     "nvidia-gpu-operator"
     "openshift-nfd"
-    "cert-manager-operator"
 )
 
 # CSV info for operator apps: app-name -> "csv-prefix|namespace"

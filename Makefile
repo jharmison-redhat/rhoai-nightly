@@ -200,10 +200,10 @@ scale:
 # GitOps refresh - pull latest from git without triggering sync
 # Use this to update ArgoCD's view of git state
 refresh:
-	@echo "Refreshing all apps from git (hard refresh)..."
-	@oc get applications.argoproj.io -n openshift-gitops -o name | \
-	  xargs -I {} oc annotate {} -n openshift-gitops argocd.argoproj.io/refresh=hard --overwrite
-	@echo "All apps refreshed from git."
+	@echo "Refreshing rhoai-nightly apps from git (hard refresh)..."
+	@APPS=$$(oc get applications.argoproj.io -n openshift-gitops -o json | jq -r '.items[] | select(.metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or any(.metadata.ownerReferences[]?; .kind == "ApplicationSet" and (.name == "cluster-operators-applicationset" or .name == "cluster-oper-instances-applicationset"))) | "application.argoproj.io/" + .metadata.name'); \
+	for app in $$APPS; do oc annotate $$app -n openshift-gitops argocd.argoproj.io/refresh=hard --overwrite; done
+	@echo "rhoai-nightly apps refreshed from git."
 	@echo "Apps will show OutOfSync if git differs from cluster."
 	@echo "Run 'make sync' to apply changes, or 'make status' to check."
 
@@ -222,38 +222,38 @@ sync:
 
 # Sync a single app and trigger immediate sync
 sync-app:
-	@echo "Enabling sync for $(APP)..."
-	@oc patch application.argoproj.io/$(APP) -n openshift-gitops --type=merge \
-	  -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
-	@echo "Triggering sync..."
-	@oc annotate application.argoproj.io/$(APP) -n openshift-gitops \
-	  argocd.argoproj.io/refresh=normal --overwrite
-	@echo "Sync enabled and triggered for $(APP)"
+	@APP_JSON=$$(oc get application.argoproj.io/$(APP) -n openshift-gitops -o json) || exit $$?; \
+	echo "$$APP_JSON" | jq -e 'if .metadata.name == "cert-manager" then .metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" else .metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or any(.metadata.ownerReferences[]?; .kind == "ApplicationSet" and (.name == "cluster-operators-applicationset" or .name == "cluster-oper-instances-applicationset")) end' >/dev/null || { echo "ERROR: Application/$(APP) is not owned by rhoai-nightly"; exit 1; }; \
+	echo "Enabling sync for $(APP)..."; \
+	oc patch application.argoproj.io/$(APP) -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'; \
+	echo "Triggering sync..."; \
+	oc annotate application.argoproj.io/$(APP) -n openshift-gitops argocd.argoproj.io/refresh=normal --overwrite; \
+	echo "Sync enabled and triggered for $(APP)"
 
 # Disable auto-sync on all ArgoCD applications
 sync-disable:
-	@echo "Disabling auto-sync on all ArgoCD applications..."
-	@oc get applications.argoproj.io -n openshift-gitops -o name | xargs -I {} oc patch {} -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+	@echo "Disabling auto-sync on rhoai-nightly applications..."
+	@APPS=$$(oc get applications.argoproj.io -n openshift-gitops -o json | jq -r '.items[] | select(.metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or any(.metadata.ownerReferences[]?; .kind == "ApplicationSet" and (.name == "cluster-operators-applicationset" or .name == "cluster-oper-instances-applicationset"))) | "application.argoproj.io/" + .metadata.name'); \
+	for app in $$APPS; do oc patch $$app -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":{"automated":null}}}'; done
 	@echo "Auto-sync disabled. You can now make manual changes."
 	@echo "Re-enable with: make sync-enable"
 
 # Re-enable auto-sync on all ArgoCD applications
 sync-enable:
-	@echo "Re-enabling auto-sync on all ArgoCD applications..."
-	@oc get applications.argoproj.io -n openshift-gitops -o name | xargs -I {} oc patch {} -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
+	@echo "Re-enabling auto-sync on rhoai-nightly applications..."
+	@APPS=$$(oc get applications.argoproj.io -n openshift-gitops -o json | jq -r '.items[] | select(.metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or any(.metadata.ownerReferences[]?; .kind == "ApplicationSet" and (.name == "cluster-operators-applicationset" or .name == "cluster-oper-instances-applicationset"))) | "application.argoproj.io/" + .metadata.name'); \
+	for app in $$APPS; do oc patch $$app -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'; done
 	@echo "Auto-sync re-enabled."
 
 # Refresh from git AND sync all apps (one-time, does not change auto-sync setting)
 # Use when auto-sync is disabled and you want to apply latest from git
 refresh-apps:
-	@echo "Refreshing all apps from git..."
-	@oc get applications.argoproj.io -n openshift-gitops -o name | \
-	  xargs -I {} oc annotate {} -n openshift-gitops argocd.argoproj.io/refresh=hard --overwrite
-	@echo "Triggering sync on all apps..."
-	@oc get applications.argoproj.io -n openshift-gitops -o name | \
-	  xargs -I {} oc patch {} -n openshift-gitops --type=merge \
-	    -p '{"operation":{"initiatedBy":{"username":"make"},"sync":{"prune":true}}}'
-	@echo "All apps refreshed and syncing."
+	@echo "Refreshing rhoai-nightly apps from git..."
+	@APPS=$$(oc get applications.argoproj.io -n openshift-gitops -o json | jq -r '.items[] | select(.metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or any(.metadata.ownerReferences[]?; .kind == "ApplicationSet" and (.name == "cluster-operators-applicationset" or .name == "cluster-oper-instances-applicationset"))) | "application.argoproj.io/" + .metadata.name'); \
+	for app in $$APPS; do oc annotate $$app -n openshift-gitops argocd.argoproj.io/refresh=hard --overwrite; done; \
+	echo "Triggering sync on rhoai-nightly apps..."; \
+	for app in $$APPS; do oc patch $$app -n openshift-gitops --type=merge -p '{"operation":{"initiatedBy":{"username":"make"},"sync":{"prune":true}}}'; done
+	@echo "rhoai-nightly apps refreshed and syncing."
 
 # Remove worker role from master nodes (run after workers are Ready)
 dedicate-masters:
@@ -315,4 +315,3 @@ evalhub: ## Enable eval-hub (EvalHub + MLflow + DSPA in evalhub-tenant ns)
 evalhub-uninstall: ## Disable eval-hub (deletes Application)
 	@chmod +x scripts/install-evalhub.sh
 	@scripts/install-evalhub.sh --uninstall
-

@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: cluster-config
   namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: rhoai-nightly
 spec:
   project: default
   source:

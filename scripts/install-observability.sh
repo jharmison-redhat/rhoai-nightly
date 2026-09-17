@@ -544,6 +544,8 @@ kind: Application
 metadata:
   name: instance-maas-observability
   namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: rhoai-nightly
   annotations:
     argocd.argoproj.io/compare-options: IgnoreExtraneous
     argocd.argoproj.io/sync-options: Prune=false

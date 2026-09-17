@@ -193,6 +193,8 @@ kind: Application
 metadata:
   name: instance-maas
   namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: rhoai-nightly
   annotations:
     argocd.argoproj.io/compare-options: IgnoreExtraneous
   finalizers:

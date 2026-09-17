@@ -83,15 +83,16 @@ clear_sync_failure() {
 }
 
 approve_pending_installplans() {
-    # Approve any pending InstallPlans in openshift-operators namespace
-    local pending
-    pending=$(oc get installplan -n openshift-operators -o jsonpath='{range .items[?(@.spec.approved==false)]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
-    if [[ -n "$pending" ]]; then
-        for ip in $pending; do
-            log_info "Auto-approving InstallPlan: $ip"
-            oc patch installplan "$ip" -n openshift-operators --type=merge -p '{"spec":{"approved":true}}' 2>/dev/null || true
-        done
-    fi
+    local app="$1" sub ns ip
+    while IFS=/ read -r ns sub; do
+        [[ -z "$sub" ]] && continue
+        ip=$(oc get subscription "$sub" -n "$ns" -o jsonpath='{.status.installplan.name}' 2>/dev/null || true)
+        [[ -z "$ip" ]] && continue
+        if [[ "$(oc get installplan "$ip" -n "$ns" -o jsonpath='{.spec.approved}' 2>/dev/null || true)" == "false" ]]; then
+            log_info "Auto-approving InstallPlan for $sub: $ip"
+            oc patch installplan "$ip" -n "$ns" --type=merge -p '{"spec":{"approved":true}}' 2>/dev/null || true
+        fi
+    done < <(oc get application.argoproj.io/"$app" -n openshift-gitops -o json 2>/dev/null | jq -r '.status.resources[]? | select(.kind == "Subscription" and (.group == "operators.coreos.com" or .group == "")) | "\(.namespace)/\(.name)"')
 }
 
 sync_app() {
@@ -130,7 +131,7 @@ sync_app() {
         argocd.argoproj.io/refresh=normal --overwrite
 
     # Auto-approve any pending InstallPlans (OLM sometimes sets Manual regardless of subscription)
-    approve_pending_installplans
+    approve_pending_installplans "$app"
 
     # Wait for healthy
     log_info "Waiting for $app to be Healthy (timeout: ${HEALTH_TIMEOUT}s)..."
@@ -159,7 +160,7 @@ sync_app() {
         fi
 
         # Auto-approve any pending InstallPlans while waiting
-        approve_pending_installplans
+        approve_pending_installplans "$app"
 
         # Progress indicator
         printf "  %s: sync=%s health=%s (%ds)\r" "$app" "$sync" "$health" "$elapsed"
@@ -173,6 +174,9 @@ wait_for_all_apps() {
     local start_time=$(date +%s)
 
     for app in "${SYNC_ORDER[@]}"; do
+        if [[ "$app" == "cert-manager" ]] && [[ "$(oc get application.argoproj.io/cert-manager -n openshift-gitops -o jsonpath='{.metadata.labels.app\.kubernetes\.io/part-of}' 2>/dev/null || true)" != "rhoai-nightly" ]]; then
+            continue
+        fi
         while ! oc get application.argoproj.io/"$app" -n openshift-gitops &>/dev/null; do
             local elapsed=$(($(date +%s) - start_time))
             if [[ $elapsed -ge $timeout ]]; then
@@ -202,6 +206,9 @@ main() {
     local skipped=0
 
     for app in "${SYNC_ORDER[@]}"; do
+        if [[ "$app" == "cert-manager" ]] && [[ "$(oc get application.argoproj.io/cert-manager -n openshift-gitops -o jsonpath='{.metadata.labels.app\.kubernetes\.io/part-of}' 2>/dev/null || true)" != "rhoai-nightly" ]]; then
+            continue
+        fi
         if sync_app "$app"; then
             success=$((success + 1))
         else

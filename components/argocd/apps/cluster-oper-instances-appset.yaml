@@ -3,6 +3,8 @@ kind: ApplicationSet
 metadata:
   name: cluster-oper-instances-applicationset
   namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: rhoai-nightly
   annotations:
     argocd.argoproj.io/compare-options: IgnoreExtraneous
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
@@ -67,6 +69,8 @@ spec:
   template:
     metadata:
       name: "{{values.name}}"
+      labels:
+        app.kubernetes.io/part-of: rhoai-nightly
       annotations:
         argocd.argoproj.io/compare-options: IgnoreExtraneous
         argocd.argoproj.io/sync-options: Prune=false

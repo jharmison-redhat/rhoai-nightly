@@ -64,45 +64,11 @@ wait_for_app_deletion() {
 # Leftover CSVs/subscriptions cause "not referenced by a subscription" errors
 # on redeploy, poisoning OLM resolution for the entire namespace.
 cleanup_olm_state() {
-    log_step "Cleaning up OLM state (orphan CSVs, Subscriptions, InstallPlans)..."
-
-    for ns in "${OPERATOR_NAMESPACES[@]}"; do
-        if ! oc get namespace "$ns" &>/dev/null; then
-            continue
-        fi
-
-        # Delete all Subscriptions first (official OLM uninstall order)
-        # This includes OLM-created dependency subscriptions that ArgoCD doesn't manage
-        local subs
-        subs=$(oc get subscription -n "$ns" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null \
-            | grep -v "openshift-gitops" || true)
-        if [[ -n "$subs" ]]; then
-            for sub in $subs; do
-                log_info "Deleting Subscription: $sub (namespace: $ns)"
-                run_cmd "oc delete subscription '$sub' -n '$ns' --ignore-not-found 2>/dev/null || true"
-            done
-        fi
-
-        # Delete all CSVs (except GitOps operator)
-        local csvs
-        csvs=$(oc get csv -n "$ns" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null \
-            | grep -v "openshift-gitops" || true)
-        if [[ -n "$csvs" ]]; then
-            for csv in $csvs; do
-                log_info "Deleting CSV: $csv (namespace: $ns)"
-                run_cmd "oc delete csv '$csv' -n '$ns' --ignore-not-found --timeout=60s 2>/dev/null || true"
-            done
-        fi
-
-        # Delete all InstallPlans
-        local ips
-        ips=$(oc get installplan -n "$ns" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null || true)
-        if [[ -n "$ips" ]]; then
-            for ip in $ips; do
-                log_info "Deleting InstallPlan: $ip (namespace: $ns)"
-                run_cmd "oc delete installplan '$ip' -n '$ns' --ignore-not-found 2>/dev/null || true"
-            done
-        fi
+    log_step "Cleaning up exact framework Subscriptions..."
+    local definition ns sub
+    for definition in "${OPERATOR_DEFINITIONS[@]}"; do
+        IFS='|' read -r ns sub _ <<<"$definition"
+        run_cmd "oc delete subscription '$sub' -n '$ns' --ignore-not-found 2>/dev/null || true"
     done
 }
 
@@ -112,6 +78,18 @@ delete_app_with_cascade() {
     # Check if app exists
     if ! oc get application.argoproj.io/"$app" -n openshift-gitops &>/dev/null; then
         log_info "App '$app' not found, skipping"
+        return 0
+    fi
+
+    local app_json
+    app_json=$(oc get application.argoproj.io/"$app" -n openshift-gitops -o json)
+    if ! jq -e '
+        .metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or
+        any(.metadata.ownerReferences[]?; .kind == "ApplicationSet" and
+            (.name == "cluster-operators-applicationset" or .name == "cluster-oper-instances-applicationset")) or
+        (.metadata.name == "cluster-config" and .spec.source.path == "clusters/overlays/rhoaibu-cluster-nightly")
+    ' <<<"$app_json" >/dev/null; then
+        log_warn "Application/$app is not owned by rhoai-nightly; skipping"
         return 0
     fi
 
@@ -141,7 +119,14 @@ delete_app_with_cascade() {
 disable_applicationsets() {
     log_step "Disabling ApplicationSets (prevents app recreation)..."
     local appsets
-    appsets=$(oc get applicationsets.argoproj.io -n openshift-gitops -o name 2>/dev/null || true)
+    appsets=$(oc get applicationsets.argoproj.io -n openshift-gitops -o json 2>/dev/null | jq -r '
+        .items[] | select(
+            .metadata.name == "cluster-operators-applicationset" and
+            (.metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or .spec.template.spec.source.path == "{{path}}") or
+            .metadata.name == "cluster-oper-instances-applicationset" and
+            (.metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or .spec.template.spec.source.path == "{{values.path}}")
+        ) | "applicationset.argoproj.io/" + .metadata.name
+    ' || true)
 
     for appset in $appsets; do
         local name="${appset#applicationset.argoproj.io/}"
@@ -152,7 +137,18 @@ disable_applicationsets() {
 
 delete_applicationsets() {
     log_step "Deleting ArgoCD applicationsets..."
-    run_cmd "oc delete applicationsets.argoproj.io --all -n openshift-gitops --ignore-not-found 2>/dev/null || true"
+    local appsets
+    appsets=$(oc get applicationsets.argoproj.io -n openshift-gitops -o json 2>/dev/null | jq -r '
+        .items[] | select(
+            .metadata.name == "cluster-operators-applicationset" and
+            (.metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or .spec.template.spec.source.path == "{{path}}") or
+            .metadata.name == "cluster-oper-instances-applicationset" and
+            (.metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or .spec.template.spec.source.path == "{{values.path}}")
+        ) | .metadata.name
+    ' || true)
+    for appset in $appsets; do
+        run_cmd "oc delete applicationset.argoproj.io/$appset -n openshift-gitops --ignore-not-found 2>/dev/null || true"
+    done
 }
 
 cleanup_namespaces() {
@@ -180,7 +176,7 @@ main() {
 
     # Check if any apps exist
     local app_count
-    app_count=$(oc get applications.argoproj.io -n openshift-gitops --no-headers 2>/dev/null | wc -l || echo 0)
+    app_count=$(oc get applications.argoproj.io -n openshift-gitops -o json 2>/dev/null | jq '[.items[] | select(.metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or any(.metadata.ownerReferences[]?; .kind == "ApplicationSet" and (.name == "cluster-operators-applicationset" or .name == "cluster-oper-instances-applicationset")) or (.metadata.name == "cluster-config" and .spec.source.path == "clusters/overlays/rhoaibu-cluster-nightly"))] | length' || echo 0)
     app_count="${app_count// /}"  # trim whitespace
 
     echo ""
@@ -206,9 +202,16 @@ main() {
         echo ""
     done
 
-    # Step 3: Delete any remaining applications not in our list
+    # Step 3: Delete only remaining rhoai-nightly applications.
     local remaining
-    remaining=$(oc get applications.argoproj.io -n openshift-gitops -o name 2>/dev/null || true)
+    remaining=$(oc get applications.argoproj.io -n openshift-gitops -o json 2>/dev/null | jq -r '
+        .items[] | select(
+            .metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or
+            any(.metadata.ownerReferences[]?; .kind == "ApplicationSet" and
+                (.name == "cluster-operators-applicationset" or .name == "cluster-oper-instances-applicationset")) or
+            (.metadata.name == "cluster-config" and .spec.source.path == "clusters/overlays/rhoaibu-cluster-nightly")
+        ) | .metadata.name
+    ' || true)
     if [[ -n "$remaining" ]]; then
         log_step "Deleting remaining applications..."
         for app in $remaining; do
@@ -224,9 +227,6 @@ main() {
     if [[ "$DRY_RUN" != "true" ]]; then
         cleanup_olm_state
     fi
-
-    # Step 6: Clean up any remaining namespaces
-    cleanup_namespaces
 
     echo ""
     log_info "Undeploy complete!"

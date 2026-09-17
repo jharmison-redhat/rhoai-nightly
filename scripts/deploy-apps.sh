@@ -90,10 +90,30 @@ log_info "ArgoCD is ready"
 log_info "Using repo: $REPO_URL"
 log_info "Using branch: $BRANCH"
 
+for appset in "cluster-operators-applicationset" "cluster-oper-instances-applicationset"; do
+    APPSET_JSON=$(oc get applicationset.argoproj.io "$appset" -n openshift-gitops --ignore-not-found -o json 2>/dev/null || true)
+    if [[ -n "$APPSET_JSON" ]] && ! jq -e --arg appset "$appset" '
+        .metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or
+        ($appset == "cluster-operators-applicationset" and .spec.template.spec.source.path == "{{path}}") or
+        ($appset == "cluster-oper-instances-applicationset" and .spec.template.spec.source.path == "{{values.path}}")
+    ' <<<"$APPSET_JSON" >/dev/null; then
+        log_error "ApplicationSet/$appset is not owned by rhoai-nightly; refusing to modify it"
+        exit 1
+    fi
+done
+
 # Step 1: Apply cluster-config WITHOUT auto-sync
 log_step "Applying cluster-config Application (sync disabled)..."
 
 CLUSTER_CONFIG="$REPO_ROOT/bootstrap/rhoaibu-cluster-nightly/cluster-config-app.yaml"
+EXISTING_CLUSTER_CONFIG=$(oc get application.argoproj.io/cluster-config -n openshift-gitops --ignore-not-found -o json 2>/dev/null || true)
+if [[ -n "$EXISTING_CLUSTER_CONFIG" ]] && ! jq -e '
+    .metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or
+    .spec.source.path == "clusters/overlays/rhoaibu-cluster-nightly"
+' <<<"$EXISTING_CLUSTER_CONFIG" >/dev/null; then
+    log_error "Application/cluster-config is not owned by rhoai-nightly; refusing to modify it"
+    exit 1
+fi
 TEMP_CONFIG=$(mktemp)
 trap "rm -f $TEMP_CONFIG" EXIT
 
@@ -146,6 +166,15 @@ for appset in "cluster-operators-applicationset" "cluster-oper-instances-applica
         printf "  Waiting for: %s (%ds)...\r" "$appset" "$elapsed"
         sleep 3
     done
+    APPSET_JSON=$(oc get applicationset.argoproj.io "$appset" -n openshift-gitops -o json)
+    if ! jq -e --arg appset "$appset" '
+        .metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or
+        ($appset == "cluster-operators-applicationset" and .spec.template.spec.source.path == "{{path}}") or
+        ($appset == "cluster-oper-instances-applicationset" and .spec.template.spec.source.path == "{{values.path}}")
+    ' <<<"$APPSET_JSON" >/dev/null; then
+        log_error "ApplicationSet/$appset is not owned by rhoai-nightly; refusing to modify it"
+        exit 1
+    fi
     log_info "ApplicationSet created: $appset"
 done
 
@@ -210,6 +239,8 @@ kind: Application
 metadata:
   name: cert-manager
   namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: rhoai-nightly
 spec:
   project: default
   syncPolicy: {}
@@ -262,10 +293,21 @@ done
 echo ""
 log_info "All ${#EXPECTED_APPS[@]} apps created!"
 
-# Step 9: Patch all generated apps with correct repo/branch
+# Step 9: Patch only rhoai-nightly generated and standalone apps with correct repo/branch
 # ApplicationSets use create-only policy, so existing apps need direct patching
-log_step "Patching all apps with repo/branch..."
-for app in $(oc get applications.argoproj.io -n openshift-gitops -o name | grep -Ev 'cluster-config|cert-manager'); do
+log_step "Patching rhoai-nightly apps with repo/branch..."
+for app in $(oc get applications.argoproj.io -n openshift-gitops -o json | jq -r '
+    .items[] |
+    select(.metadata.name != "cluster-config" and .metadata.name != "cert-manager") |
+    select(
+        .metadata.labels["app.kubernetes.io/part-of"] == "rhoai-nightly" or
+        any(.metadata.ownerReferences[]?; .kind == "ApplicationSet" and
+            (.name == "cluster-operators-applicationset" or .name == "cluster-oper-instances-applicationset")) or
+        ((.metadata.name == "instance-maas" and .spec.source.path == "components/instances/maas-instance/chart") or
+         (.metadata.name == "instance-maas-observability" and .spec.source.path == "components/instances/maas-observability/base") or
+         (.metadata.name == "instance-evalhub" and .spec.source.path == "components/instances/evalhub"))
+    ) | "application.argoproj.io/" + .metadata.name
+'); do
     oc patch "$app" -n openshift-gitops --type=merge -p "{
         \"spec\": {
             \"source\": {
@@ -275,7 +317,7 @@ for app in $(oc get applications.argoproj.io -n openshift-gitops -o name | grep 
         }
     }" 2>/dev/null || true
 done
-log_info "All apps patched with: $REPO_URL @ $BRANCH"
+log_info "rhoai-nightly apps patched with: $REPO_URL @ $BRANCH"
 log_info ""
 log_info "Apps are deployed with sync DISABLED."
 log_info "Run 'make sync' to sync apps in dependency order."

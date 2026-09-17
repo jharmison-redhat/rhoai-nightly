@@ -15,9 +15,9 @@ spec:
     feastoperator:
       managementState: Managed
     aigateway:
-      managementState: Removed
+      managementState: Managed
       modelsAsAService:
-        managementState: Removed
+        managementState: Managed
     mcplifecycleoperator:
       managementState: Managed
     kserve:

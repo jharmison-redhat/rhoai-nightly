@@ -105,9 +105,11 @@ oc get datasciencecluster default-dsc &>/dev/null || { log_error "DataScienceClu
 log_info "DataScienceCluster found"
 
 # Check DSC modelsAsService
-MAAS_STATE=$(oc get datasciencecluster default-dsc -o jsonpath='{.spec.components.kserve.modelsAsService.managementState}' 2>/dev/null)
-if [ "$MAAS_STATE" != "Managed" ]; then
-    log_warn "modelsAsService managementState is '${MAAS_STATE:-not set}' (expected 'Managed')"
+MAAS_STATE=$(oc get datasciencecluster default-dsc -o jsonpath='{.spec.components.aigateway.modelsAsAService.managementState}' 2>/dev/null)
+GATEWAY_STATE=$(oc get datasciencecluster default-dsc -o jsonpath='{.spec.components.aigateway.managementState}' 2>/dev/null)
+if [ "$MAAS_STATE" != "Managed" ] || [ "$GATEWAY_STATE" != "Managed" ]; then
+    log_warn "modelsAsAService managementState is '${MAAS_STATE:-not set}' (expected 'Managed')"
+    log_warn "aigateway managementState is '${GATEWAY_STATE:-not set}' (expected 'Managed')"
     log_warn "The DSC change should be synced via ArgoCD before running this script"
 else
     log_info "modelsAsService managementState: Managed"

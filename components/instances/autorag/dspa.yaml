@@ -21,10 +21,15 @@ spec:
     # NOTE (docs drift): the 3.5 docs say set `managedPipelines: {}`, but on
     # the 3.5 nightly the DSPO reports ManagedPipelineValid=False with
     # "Managed pipelines not configured or no explicit pipeline list" unless
-    # the pipelines are listed explicitly. The init container
-    # (init-managed-pipelines) compiles exactly these four from the
-    # pipelines-components image; ManagedPipelineValid=True confirms it.
+    # the pipelines are listed explicitly. And with an explicit list but no
+    # image, the DSPO reconcile fails with "Managed pipeline configuration
+    # error (permanent) / invalid image reference \"\"" — the params step does
+    # not fill ManagedPipelines.Image from operator config (Images.
+    # PipelinesComponents) the way the CRD description says it should. Pin the
+    # image this build's operator ships (RELATED_IMAGE_ODH_PIPELINES_
+    # COMPONENTS_IMAGE / dspo-config CM, 3.5.1 nightly 53c03c57).
     managedPipelines:
+      image: registry.redhat.io/rhoai/odh-pipelines-components-rhel9@sha256:509cc5943bb396a888c3e2ee66b20d868b60536e4f2e52bc06a7e85cdf70199e
       pipelines:
         - name: documents-indexing-pipeline
         - name: autogluon-tabular-training-pipeline

@@ -203,7 +203,7 @@ Always pass the branch inline. Example:
 GITOPS_BRANCH=<detected-branch> make deploy 2>&1 | tee $LOGDIR/phase8-deploy.log
 ```
 
-`deploy-apps.sh` creates apps with sync DISABLED, then patches both ApplicationSets and every child Application to point at the requested branch. This happens on the cluster — the checked-in YAML is not modified.
+`deploy-apps.sh` creates apps with sync DISABLED, then patches both ApplicationSets and every child Application to point at the requested branch. This happens on the cluster — the checked-in YAML is not modified. The patch also (re)applies the `app.kubernetes.io/part-of: rhoai-nightly` ownership label, so Applications created before the label existed are adopted on the next deploy.
 
 Verify: `oc get applications.argoproj.io -n openshift-gitops` lists all expected apps.
 

@@ -60,6 +60,16 @@ make clean        # undeploy + remove leftover operators/CSVs
 - **`make clean`** runs `undeploy` first, then removes operators and CSVs that were
   pre-installed outside the ApplicationSets.
 
+`make undeploy` only deletes Applications owned by this rig (ownership = the
+`app.kubernetes.io/part-of: rhoai-nightly` label, an ApplicationSet ownerReference, or
+a known standalone path). Applications without the label are skipped with a
+`not owned by rhoai-nightly; skipping` log message. Apps created before the label
+existed are healed by the next `make deploy`, or label them immediately:
+
+```bash
+oc label application.argoproj.io/<app-name> -n openshift-gitops app.kubernetes.io/part-of=rhoai-nightly
+```
+
 Both prompt for confirmation. To skip the prompt in automation:
 
 ```bash

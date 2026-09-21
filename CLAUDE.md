@@ -433,6 +433,20 @@ oc patch application.argoproj.io/<app-name> -n openshift-gitops \
 - New Applications are created automatically with the current template
 - No manual intervention needed for new apps
 
+### Application Ownership (lifecycle scoping)
+
+`make refresh`, `sync`, `sync-app`, `sync-disable`, `sync-enable`, `refresh-apps`, `make undeploy`, and the Step 9 patch loop in `deploy-apps.sh` only touch ArgoCD Applications/ApplicationSets owned by this rig. Ownership = the `app.kubernetes.io/part-of: rhoai-nightly` label, an ApplicationSet ownerReference from `cluster-operators-applicationset`/`cluster-oper-instances-applicationset`, or a known standalone path (`cluster-config`, `instance-maas`, `instance-maas-observability`, `instance-evalhub`). Unowned resources are skipped or hard-fail with a "not owned by rhoai-nightly" error — never silently modified or deleted.
+
+Everything this repo creates carries the label: ApplicationSet templates stamp it on generated Applications, and the install scripts (`install-maas.sh`, `install-observability.sh`, `install-evalhub.sh`, `deploy-apps.sh` cert-manager) set it on standalone Applications. `deploy-apps.sh` Step 9 also (re)applies the label while patching repo/branch, so pre-label apps are adopted on the next `make deploy`.
+
+**Migration note:** Applications created before this label existed (`instance-maas`, `instance-maas-observability`, `instance-evalhub`) are skipped by lifecycle scripts until the next `make deploy` heals them, or immediately via:
+
+```bash
+oc label application.argoproj.io/<app-name> -n openshift-gitops app.kubernetes.io/part-of=rhoai-nightly
+```
+
+**Agent rule:** when adding a new install script that creates an ArgoCD Application, include the `app.kubernetes.io/part-of: rhoai-nightly` label in the manifest — otherwise the lifecycle scripts will not manage it.
+
 ### Remote References with Local Patches
 
 Components reference the [redhat-cop/gitops-catalog](https://github.com/redhat-cop/gitops-catalog) repository and apply local patches:

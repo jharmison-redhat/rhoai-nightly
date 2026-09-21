@@ -106,7 +106,7 @@ Report to the user:
 
 **Skip if:** `--skip-undeploy` was passed, or no ArgoCD Applications exist.
 
-This phase removes all ArgoCD Applications with cascade deletion (ArgoCD deletes the managed resources before removing the app), then removes ApplicationSets.
+This phase removes all ArgoCD Applications with cascade deletion (ArgoCD deletes the managed resources before removing the app), then removes ApplicationSets. Undeploy is ownership-scoped — only Applications with the `app.kubernetes.io/part-of: rhoai-nightly` label (or created by this repo) are deleted; label-less apps are skipped and should be labeled if they should be removed.
 
 Run `make undeploy SKIP_CONFIRM=true` in the background. Monitor with:
 ```

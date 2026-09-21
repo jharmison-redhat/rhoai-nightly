@@ -122,5 +122,8 @@ make cleanup-projects # audit stale dashboard projects (audit-only by default)
 make undeploy         # remove ArgoCD apps
 make clean            # undeploy + leftover operators
 
+# Teardown is ownership-scoped: only Applications labeled
+# app.kubernetes.io/part-of: rhoai-nightly (or created by this repo) are touched.
+
 make help             # full target list
 ```

@@ -293,7 +293,8 @@ done
 echo ""
 log_info "All ${#EXPECTED_APPS[@]} apps created!"
 
-# Step 9: Patch only rhoai-nightly generated and standalone apps with correct repo/branch
+# Step 9: Patch only rhoai-nightly generated and standalone apps with correct repo/branch,
+# (re)applying the ownership label so pre-label apps are adopted
 # ApplicationSets use create-only policy, so existing apps need direct patching
 log_step "Patching rhoai-nightly apps with repo/branch..."
 for app in $(oc get applications.argoproj.io -n openshift-gitops -o json | jq -r '
@@ -309,6 +310,11 @@ for app in $(oc get applications.argoproj.io -n openshift-gitops -o json | jq -r
     ) | "application.argoproj.io/" + .metadata.name
 '); do
     oc patch "$app" -n openshift-gitops --type=merge -p "{
+        \"metadata\": {
+            \"labels\": {
+                \"app.kubernetes.io/part-of\": \"rhoai-nightly\"
+            }
+        },
         \"spec\": {
             \"source\": {
                 \"repoURL\": \"$REPO_URL\",

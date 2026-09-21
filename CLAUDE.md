@@ -99,6 +99,7 @@ rhoai-nightly/
 │       ├── maas-instance/               # MaaS Helm chart (PostgreSQL+PVC, Gateway)
 │       ├── maas-observability/          # MaaS observability (TelemetryPolicy + Istio Telemetry)
 │       ├── evalhub/                     # EvalHub + MLflow + DSPA (make evalhub)
+│       ├── autorag/                     # AutoML/AutoRAG test tenant (DSPA + pgvector, make autorag)
 │       ├── external-secrets-instance/   # External Secrets instance config
 │       └── maas-models/                # MaaS model manifests (kustomize)
 │           ├── simulator/              # CPU-only mock model
@@ -826,6 +827,55 @@ oc get route -n evalhub-tenant
 oc get application.argoproj.io/instance-evalhub -n openshift-gitops
 ```
 
+## AutoML & AutoRAG (Tech Preview)
+
+AutoML (tabular model selection) and AutoRAG (RAG config optimization) are RHOAI 3.5
+Technology Preview features. `make autorag` / `make autorag-uninstall` toggle a
+dedicated `autorag-tenant` test project, orthogonal to MaaS / observability / eval-hub.
+
+### Architecture
+
+- **GitOps (kustomize)** — `components/instances/autorag/`:
+  - `autorag-tenant` namespace (dashboard-visible, `opendatahub.io/dashboard: "true"`)
+  - `DataSciencePipelinesApplication/dspa` — near-copy of the evalhub DSPA plus
+    `spec.apiServer.managedPipelines: {}` (the docs' "Enable AutoML and AutoRAG
+    pipelines" checkbox). The DSPA's init container compiles and uploads the managed
+    pipeline definitions at startup; status condition `ManagedPipelineValid` confirms it.
+  - `pgvector` Deployment + PVC + Service — mirrors the MaaS PostgreSQL pattern
+    (Recreate, PVC-backed data dir, probes, 512Mi/1Gi) with image `pgvector/pgvector:pg16`
+    (the pgvector extension isn't in `registry.redhat.io/rhel9/postgresql-16`, so the
+    official-image conventions apply: `POSTGRES_*` env names map directly from the
+    secret, initdb scripts run from `/docker-entrypoint-initdb.d/` — see
+    `pgvector-init.yaml` with `CREATE EXTENSION vector`)
+- **Imperative (install-autorag.sh)** — things that can't be in git:
+  - `autorag-pg-creds` secret (generated password, idempotent with read-back —
+    mirrors install-maas.sh Phase 2)
+  - `instance-autorag` ArgoCD Application (kustomize source, resources-finalizer,
+    automated sync — mirrors install-evalhub.sh Phase A; detects repoURL/branch from
+    `instance-rhoai` for fork support)
+
+The dashboard feature flags (`automl: true`, `autorag: true`) are set repo-wide in
+`components/instances/rhoai-instance/base/odh-dashboard-config.yaml` — the script
+doesn't touch them.
+
+### Enable knob recap (docs prerequisites)
+
+1. `dashboardConfig.automl`/`autorag: true` (OdhDashboardConfig — already in repo base)
+2. Pipeline server with `spec.apiServer.managedPipelines: {}` (this component's DSPA;
+   AutoML/AutoRAG pages appear per-project for projects that have one)
+3. AutoRAG: **remote vector DB only** — Milvus or pgvector (this component deploys pgvector)
+4. RHOAIENG-64768 (hardcoded pipeline image SHA → ImagePullBackOff) was fixed upstream
+   2026-07-01; a fresh DSPA uploads fixed definitions. See docs/autorag.md.
+
+### Verification commands
+
+```bash
+oc get application.argoproj.io/instance-autorag -n openshift-gitops
+oc get dspa dspa -n autorag-tenant -o jsonpath='{.status.conditions[?(@.type=="ManagedPipelineValid")].status}'
+oc get pods -n autorag-tenant
+oc exec -n autorag-tenant deployment/pgvector -- psql -U autorag -d autorag -c '\dx'
+```
+
 ## Script Implementation Details
 
 ### Script Behavior
@@ -852,6 +902,8 @@ Expected wait times for each script:
 - `observability`: ~3-5 minutes (settle-gate check, overlay flip, wait for Perses/Tempo/OTel to reconcile, then Kuadrant patch + conditional ServiceMonitors). Run separately from `make maas`.
 - `evalhub`: ~3-5 minutes (lightweight settle-gate, creates instance-evalhub Application, waits for EvalHub Ready + MLflow + DSPA + evalhub-tenant). Orthogonal to MaaS / observability.
 - `evalhub-uninstall`: ~30 seconds (deletes instance-evalhub Application; resources-finalizer cascade-prunes EvalHub/MLflow/DSPA + evalhub-tenant ns).
+- `autorag`: ~3-5 minutes (creates autorag-pg-creds + instance-autorag Application, waits for pgvector rollout + DSPA ManagedPipelineValid). Orthogonal to MaaS / observability / eval-hub.
+- `autorag-uninstall`: ~30 seconds-2 minutes (deletes instance-autorag Application; resources-finalizer cascade-prunes DSPA + pgvector + autorag-tenant ns).
 - `maas-model` (simulator): ~30 seconds (CPU, no image pull needed after first time)
 - `maas-model` (GPU models): startup depends on image cache and model size. Poll `oc get pods -n llm` to 2/2 before verifying.
 - `maas-verify`: ~3 minutes (deploys temp model, runs tests, cleans up)
@@ -1081,6 +1133,7 @@ oc get mcp  # MachineConfigPool status
 | `scripts/enable-uwm.sh` | Enable UWM (idempotent merge; --check / --dry-run modes) |
 | `scripts/install-maas.sh` | MaaS install (secrets, ArgoCD app, Authorino). Does NOT install observability |
 | `scripts/install-observability.sh` | MaaS observability install/uninstall (UWM, Kuadrant, ServiceMonitors) |
+| `scripts/install-autorag.sh` | AutoML/AutoRAG test-tenant install/uninstall (pg creds, instance-autorag Application) |
 | `scripts/uninstall-maas.sh` | MaaS uninstall (cascade delete + cleanup) |
 
 ## Related Repositories

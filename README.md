@@ -3,7 +3,7 @@
 Deploy Red Hat OpenShift AI (RHOAI) 3.x **nightly** builds onto an OpenShift cluster
 using GitOps (ArgoCD). One `make` command — or one Claude Code skill — takes a bare
 cluster to a fully synced RHOAI install, with optional Models-as-a-Service (MaaS),
-observability, and Eval Hub.
+observability, Eval Hub, and AutoML/AutoRAG (Tech Preview).
 
 ## How it works
 
@@ -80,6 +80,7 @@ Full walkthroughs: **[Install with make](docs/install-make.md)** · **[Install w
 | [Install with Claude](docs/install-claude.md) | Drive the same install from Claude Code skills |
 | [MaaS (Models as a Service)](docs/maas.md) | Platform, models, observability, verification |
 | [Eval Hub](docs/evalhub.md) | TrustyAI evaluation harness (EvalHub + MLflow + DSPA) — opt-in |
+| [AutoML & AutoRAG](docs/autorag.md) | Tech Preview optimization runs (DSPA + pgvector test tenant) — opt-in |
 | [Configuration](docs/configuration.md) | `.env` reference: pull-secret modes, node sizing, models, repo/branch selection |
 | [Uninstall](docs/uninstall.md) | Remove RHOAI, MaaS, observability, Eval Hub |
 | [Known issues](docs/known-issues.md) | RHOAI product issues found by this deployment — what users will see, upstream status, what to do |
@@ -109,6 +110,9 @@ make observability    # settle-gated observability cascade
 
 # Eval Hub
 make evalhub          # EvalHub + MLflow + DSPA
+
+# AutoML/AutoRAG (Tech Preview)
+make autorag          # DSPA + pgvector test tenant (autorag-tenant ns)
 
 # Diagnostics
 make preflight        # quick readiness check

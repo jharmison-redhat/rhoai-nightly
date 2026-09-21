@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgvector-init
+  namespace: autorag-tenant
+  labels:
+    app: pgvector
+    purpose: autorag
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+data:
+  init.sql: |
+    CREATE EXTENSION IF NOT EXISTS vector;

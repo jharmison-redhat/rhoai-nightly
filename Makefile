@@ -9,7 +9,7 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
-.PHONY: help gpu cpu icsp uwm setup infra secrets gitops deploy bootstrap status all clean undeploy configure-repo scale refresh restart-catalog sync sync-app sync-disable sync-enable refresh-apps dedicate-masters maas maas-uninstall maas-verify maas-model maas-model-status maas-model-delete observability observability-uninstall evalhub evalhub-uninstall diagnose compare cleanup-projects preflight validate-config
+.PHONY: help gpu cpu icsp uwm setup infra secrets gitops deploy bootstrap status all clean undeploy configure-repo scale refresh restart-catalog sync sync-app sync-disable sync-enable refresh-apps dedicate-masters maas maas-uninstall maas-verify maas-model maas-model-status maas-model-delete observability observability-uninstall evalhub evalhub-uninstall autorag autorag-uninstall diagnose compare cleanup-projects preflight validate-config
 
 # Default target - run everything
 .DEFAULT_GOAL := all
@@ -80,6 +80,11 @@ help:
 	@echo "  make evalhub        - Enable eval-hub (EvalHub + MLflow + DSPA in evalhub-tenant ns)"
 	@echo "                        Creates instance-evalhub ArgoCD Application; orthogonal to MaaS / observability."
 	@echo "  make evalhub-uninstall - Disable eval-hub (deletes Application; ArgoCD prunes resources)"
+	@echo ""
+	@echo "AutoML/AutoRAG (Tech Preview):"
+	@echo "  make autorag        - Enable AutoML/AutoRAG test tenant (DSPA + pgvector in autorag-tenant ns)"
+	@echo "                        Creates instance-autorag ArgoCD Application; orthogonal to MaaS / observability / eval-hub."
+	@echo "  make autorag-uninstall - Disable test tenant (deletes Application; ArgoCD prunes resources)"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean        - Full cleanup (runs undeploy + removes leftover operators)"
@@ -315,3 +320,14 @@ evalhub: ## Enable eval-hub (EvalHub + MLflow + DSPA in evalhub-tenant ns)
 evalhub-uninstall: ## Disable eval-hub (deletes Application)
 	@chmod +x scripts/install-evalhub.sh
 	@scripts/install-evalhub.sh --uninstall
+
+# Enable AutoML/AutoRAG Tech Preview test tenant (DSPA + pgvector in autorag-tenant ns)
+# Orthogonal to MaaS / observability / eval-hub — dashboard flags already in rhoai-instance base
+autorag: ## Enable AutoML/AutoRAG test tenant (DSPA + pgvector in autorag-tenant ns)
+	@chmod +x scripts/install-autorag.sh
+	@scripts/install-autorag.sh
+
+# Disable AutoML/AutoRAG test tenant (deletes instance-autorag Application; ArgoCD prunes resources)
+autorag-uninstall: ## Disable AutoML/AutoRAG test tenant (deletes Application)
+	@chmod +x scripts/install-autorag.sh
+	@scripts/install-autorag.sh --uninstall

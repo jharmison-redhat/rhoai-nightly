@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# AutoML/AutoRAG Tech Preview test tenant:
+# - dedicated project (autorag-tenant) with a DSPA that enables the managed
+#   AutoML and AutoRAG pipelines (docs prerequisite: pipeline server with the
+#   "Enable AutoML and AutoRAG pipelines" checkbox = spec.apiServer.managedPipelines: {})
+# - pgvector PostgreSQL for the AutoRAG remote vector store (docs support
+#   Milvus and pgvector only — no inline vector DBs in Tech Preview)
+#
+# Dashboard feature flags automl/autorag are already enabled repo-wide in
+# components/instances/rhoai-instance/base/odh-dashboard-config.yaml.
+#
+# Prerequisites handled by scripts/install-autorag.sh (make autorag):
+#   - autorag-pg-creds secret (generated password, not in git)
+#   - instance-autorag ArgoCD Application (resources-finalizer cascade)
+resources:
+  - namespace-autorag-tenant.yaml
+  - pgvector-init.yaml
+  - pgvector.yaml
+  - dspa.yaml

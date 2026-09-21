@@ -1,0 +1,24 @@
+apiVersion: datasciencepipelinesapplications.opendatahub.io/v1
+kind: DataSciencePipelinesApplication
+metadata:
+  name: dspa
+  namespace: autorag-tenant
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  dspVersion: v2
+  podToPodTLS: false
+  objectStorage:
+    disableHealthCheck: false
+    enableExternalRoute: true
+    minio:
+      deploy: true
+      image: quay.io/opendatahub/minio:RELEASE.2019-08-14T20-37-41Z-license-compliance
+  apiServer:
+    # Enable AutoML and AutoRAG pipelines: the "Enable AutoML and AutoRAG
+    # pipelines" checkbox in the dashboard pipeline-server Advanced settings.
+    # Empty object uses the operator default pipelines-components image, whose
+    # init container compiles and uploads the managed pipeline definitions at
+    # DSPA startup (status condition ManagedPipelineValid).
+    managedPipelines: {}

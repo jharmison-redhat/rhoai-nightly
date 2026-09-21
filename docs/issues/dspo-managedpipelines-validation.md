@@ -114,11 +114,24 @@ controller's in-process pull.
   documents-indexing-pipeline
   ```
 
-  Only the DSPO's own condition is wrong, so the dashboard (and anything
-  gating on `ManagedPipelineValid`) is misled. Note the DSP API requires the
+  Only the DSPO's own condition is wrong. Note the DSP API requires the
   caller to hold RBAC on `datasciencepipelinesapplications/api` in the
   project — the namespace's own `ds-pipeline-dspa` SA gets 403; use a
   dashboard-capable token.
+
+- **The dashboard does NOT gate on the condition** (verified 2026-09-21 with
+  a headed browser, logged in as admin): the **AutoML** and **AutoRAG** Tech
+  Preview pages render in the RHOAI dashboard (`rh-ai.apps...` host, nav
+  items `Develop & train → AutoML Tech Preview` at
+  `/develop-train/automl/experiments/<project>` and `Gen AI studio → AutoRAG
+  Tech Preview` at `/gen-ai-studio/autorag/experiments/<project>`)
+  **despite** `ManagedPipelineValid=False`. For a project with the DSPA
+  (`autorag-tenant`) the AutoRAG page shows the full interface ("Create an
+  AutoRAG optimization run"); for a project without a DSPA (`ai-tenants`) it
+  shows the "Configure a pipeline server" empty state. The UI keys on the
+  project's DSPA and its pipelines, not on the condition — so defect 3's
+  blast radius is limited to the misleading condition itself, not the user
+  experience.
 
 ## Detection
 

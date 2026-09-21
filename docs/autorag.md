@@ -94,7 +94,9 @@ oc exec -n autorag-tenant deployment/pgvector -- psql -U autorag -d autorag -c '
   list" for the documented `{}` form, fails permanently on an empty image with an
   explicit list, and cannot read the image it deploys (in-process fetch without
   registry credentials). The pipelines themselves are staged, loadable, and
-  register in the DSP API with `managed=true` tags — only the condition is wrong.
+  register in the DSP API with `managed=true` tags — only the condition is wrong
+  (verified 2026-09-21: the dashboard AutoML/AutoRAG Tech Preview pages render
+  and detect the DSPA regardless).
   See [docs/issues/dspo-managedpipelines-validation.md](issues/dspo-managedpipelines-validation.md)
   (NOT FILED — ready-to-file draft). Related:
   [RHOAIENG-93742](https://redhat.atlassian.net/browse/RHOAIENG-93742) (default-on

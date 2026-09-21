@@ -89,3 +89,15 @@ oc exec -n autorag-tenant deployment/pgvector -- psql -U autorag -d autorag -c '
   `registry.redhat.io`, so every AutoML/AutoRAG run failed with ImagePullBackOff.
   **Fixed upstream 2026-07-01**; a fresh DSPA uploads the fixed definitions at startup.
   If an older DSPA persists broken definitions, delete and let it recreate.
+- `ManagedPipelineValid=False` despite working pipelines — the DSPO reports the
+  condition False with "Managed pipelines not configured or no explicit pipeline
+  list" for the documented `{}` form, fails permanently on an empty image with an
+  explicit list, and cannot read the image it deploys (in-process fetch without
+  registry credentials). The pipelines themselves are staged, loadable, and
+  register in the DSP API with `managed=true` tags — only the condition is wrong.
+  See [docs/issues/dspo-managedpipelines-validation.md](issues/dspo-managedpipelines-validation.md)
+  (NOT FILED — ready-to-file draft). Related:
+  [RHOAIENG-93742](https://redhat.atlassian.net/browse/RHOAIENG-93742) (default-on
+  for GA in 3.6),
+  [RHOAIENG-94320](https://redhat.atlassian.net/browse/RHOAIENG-94320)
+  (`{}` upgrade opt-in semantics).

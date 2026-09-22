@@ -12,4 +12,7 @@ resources:
   - hardwareprofile-cpu.yaml
   - hardwareprofile-default-disabled.yaml
   - hardwareprofile-gpu.yaml
+  - hardwareprofile-kueue-cpu.yaml
+  - hardwareprofile-kueue-gpu.yaml
+  - kueue-localqueues.yaml
   - model-catalog-sources.yaml

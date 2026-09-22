@@ -28,7 +28,7 @@ spec:
     kueue:
       defaultClusterQueueName: default
       defaultLocalQueueName: default
-      managementState: Removed
+      managementState: Unmanaged
     mlflowoperator:
       managementState: Managed
     ogx:

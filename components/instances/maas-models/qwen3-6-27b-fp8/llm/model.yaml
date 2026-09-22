@@ -9,6 +9,8 @@ metadata:
   annotations:
     openshift.io/display-name: "Red Hat AI Qwen3-6-27B FP8"
     opendatahub.io/model-type: generative
+    opendatahub.io/hardware-profile-name: kueue-gpu
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
     security.opendatahub.io/enable-auth: "true"
   labels:
     opendatahub.io/dashboard: "true"

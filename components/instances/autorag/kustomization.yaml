@@ -16,6 +16,7 @@ kind: Kustomization
 #   - instance-autorag ArgoCD Application (resources-finalizer cascade)
 resources:
   - namespace-autorag-tenant.yaml
+  - kueue-localqueues.yaml
   - pgvector-init.yaml
   - pgvector.yaml
   - dspa.yaml

@@ -10,6 +10,8 @@ metadata:
   annotations:
     openshift.io/display-name: "RedHatAI Granite 4.0-h-tiny FP8"
     opendatahub.io/model-type: generative
+    opendatahub.io/hardware-profile-name: kueue-gpu
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
     security.opendatahub.io/enable-auth: "true"
   labels:
     opendatahub.io/dashboard: "true"

@@ -10,7 +10,7 @@
 #   --replicas N           Number of replicas (default: 1)
 #   --az ZONE              Availability zone (default: auto-detected)
 #   --access-type TYPE     SHARED or PRIVATE (default: SHARED)
-#   --min N                Minimum replicas for autoscaling (default: 1)
+#   --min N                Minimum replicas for autoscaling (default: 2)
 #   --max N                Maximum replicas for autoscaling (default: 3)
 #   --dry-run              Preview without applying
 #
@@ -30,7 +30,7 @@ INSTANCE_TYPE="${GPU_INSTANCE_TYPE:-${INSTANCE_TYPE:-g6e.2xlarge}}"
 REPLICAS="${GPU_REPLICAS:-${REPLICAS:-1}}"
 ACCESS_TYPE="${GPU_ACCESS_TYPE:-${ACCESS_TYPE:-SHARED}}"
 AZ="${GPU_AZ:-}"
-AUTOSCALE_MIN="${GPU_MIN:-1}"
+AUTOSCALE_MIN="${GPU_MIN:-2}"
 AUTOSCALE_MAX="${GPU_MAX:-3}"
 DRY_RUN=false
 
@@ -52,7 +52,7 @@ Options:
   --replicas N           Number of replicas (default: 1)
   --az ZONE              Availability zone (default: auto-detected)
   --access-type TYPE     SHARED or PRIVATE (default: SHARED)
-  --min N                Minimum replicas for autoscaling (default: 1)
+  --min N                Minimum replicas for autoscaling (default: 2)
   --max N                Maximum replicas for autoscaling (default: 3)
   --dry-run              Preview without applying
 

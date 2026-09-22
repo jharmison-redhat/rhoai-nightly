@@ -96,6 +96,7 @@ rhoai-nightly/
 │       ├── jobset-instance/             # JobSet config
 │       ├── leader-worker-set-instance/  # Leader-Worker config
 │       ├── connectivity-link-instance/  # Connectivity Link config
+│       ├── kueue-instance/              # Kueue CR + ClusterQueues/ResourceFlavors (llm ns)
 │       ├── maas-instance/               # MaaS Helm chart (PostgreSQL+PVC, Gateway)
 │       ├── maas-observability/          # MaaS observability (TelemetryPolicy + Istio Telemetry)
 │       ├── evalhub/                     # EvalHub + MLflow + DSPA (make evalhub)
@@ -137,11 +138,11 @@ make icsp            # Create ImageContentSourcePolicy
                      #        oc debug node/<n> -- chroot /host grep -A3 rhoai \
                      #          /etc/containers/registries.conf
 
-make gpu             # Create GPU MachineSet (g6e.2xlarge, autoscale 1-3)
+make gpu             # Create GPU MachineSet (g6e.2xlarge, autoscale 2-3)
                      # WAITS: Until GPU node is Ready
                      # VERIFY: oc get nodes -l node-role.kubernetes.io/gpu
 
-make cpu             # Create CPU worker MachineSet (m6a.4xlarge, autoscale 1-3)
+make cpu             # Create CPU worker MachineSet (m6a.4xlarge, autoscale 2-3)
                      # WAITS: Until CPU worker node is Ready
                      # VERIFY: oc get nodes -l node-role.kubernetes.io/worker
 
@@ -324,7 +325,7 @@ QUAY_TOKEN=your-token
 GPU_INSTANCE_TYPE=g6e.2xlarge    # GPU instance type
 GPU_REPLICAS=1                   # NOTE: ignored — the script sets replicas from GPU_MIN
 GPU_ACCESS_TYPE=SHARED           # NOTE: read and logged but not applied to the MachineSet
-GPU_MIN=1                        # Minimum replicas (autoscaling)
+GPU_MIN=2                        # Minimum replicas (autoscaling)
 GPU_MAX=3                        # Maximum replicas (autoscaling)
 GPU_AZ=                          # Auto-detected if empty
 
@@ -332,7 +333,7 @@ GPU_AZ=                          # Auto-detected if empty
 CPU_INSTANCE_TYPE=m6a.4xlarge   # CPU instance type
 CPU_REPLICAS=1                   # NOTE: ignored — the script sets replicas from CPU_MIN
 CPU_VOLUME_SIZE=120              # Root volume size (GB)
-CPU_MIN=1                        # Minimum replicas (autoscaling)
+CPU_MIN=2                        # Minimum replicas (autoscaling)
 CPU_MAX=3                        # Maximum replicas (autoscaling)
 CPU_AZ=                          # Auto-detected if empty
 
@@ -874,6 +875,78 @@ oc get application.argoproj.io/instance-autorag -n openshift-gitops
 oc get dspa dspa -n autorag-tenant -o jsonpath='{.status.conditions[?(@.type=="ManagedPipelineValid")].status}'
 oc get pods -n autorag-tenant
 oc exec -n autorag-tenant deployment/pgvector -- psql -U autorag -d autorag -c '\dx'
+```
+
+## Kueue (job queueing for RHOAI workloads)
+
+Kueue is on out of the box. The **Red Hat Build of Kueue operator** owns the
+Kueue lifecycle; the **RHOAI operator** only integrates with it (hardware-profile
+webhook) and is NOT allowed to manage Kueue itself:
+
+- `components/operators/kueue-operator/` — Subscription (stable-v1.4), auto-deployed
+  by the cluster-operators ApplicationSet git directory generator.
+- `components/instances/kueue-instance/` — `instance-kueue` ApplicationSet element:
+  - `Kueue/cluster` CR (kueue.openshift.io/v1) with the workload integrations:
+    gangScheduling ByWorkload (Parallel admission), FairSharing preemption, and
+    `integrations.frameworks` covering BatchJob, Job, JobSet, Pod, Deployment,
+    StatefulSet, RayJob, RayCluster, PyTorchJob, LeaderWorkerSet (kserve serving
+    pods are Deployments; ray/trainingoperator/jobset/lws are the other controllers
+    in play in this repo).
+  - `Namespace/llm` labeled `kueue.openshift.io/managed: "true"`.
+  - `ResourceFlavor/default` (any node) + `ResourceFlavor/l40s`
+    (node-role.kubernetes.io/gpu + nvidia.com/gpu toleration — matches our GPU
+    MachineSet).
+  - Two ClusterQueues, quotas aligned to **provisionable** resources
+    (MachineAutoscaler max 3 workers / 3 GPUs):
+    - `rhoai-cpu`: 48 cpu / 192Gi (3 × m6a.4xlarge) — cpu/memory only.
+    - `rhoai-gpu`: 24 cpu / 96Gi (3 × g6e.2xlarge) + 3 GPUs (flavor `l40s`).
+    Quota > steady-state is intentional: admitted pods briefly sit unschedulable
+    and drive the autoscaler up to the max.
+  - LocalQueues, **`default` is always CPU-only** (→ `rhoai-cpu`); GPU queuing is
+    opt-in via the explicitly named `gpu` LocalQueue (→ `rhoai-gpu`):
+    - `llm`: `default` + `gpu` (in kueue-instance, which owns the namespace)
+    - `redhat-ods-applications` + `rhods-notebooks`: `default` + `gpu`
+      (in `rhoai-instance/base/kueue-localqueues.yaml` — namespaces are
+      guaranteed by the rhods-operator by the time instance-rhoai syncs)
+    - `evalhub-tenant` + `autorag-tenant`: `default` + `gpu` (inside
+      `components/instances/evalhub/` and `components/instances/autorag/` —
+      those namespaces only exist when the opt-in component is deployed, so the
+      queues ride with them)
+- `components/instances/rhoai-instance/base/datasciencecluster.yaml` sets
+  `kueue.managementState: Unmanaged` (NOT `Managed` — `KueueStateManagedNotSupported`;
+  NOT `Removed` — RHOAI must know Kueue is here to integrate). RHOAI then creates
+  its own default `Kueue` CR (skipped — ours exists), default ClusterQueue named
+  `default` and default ResourceFlavors. That default ClusterQueue is **inert**:
+  its `namespaceSelector` matches only namespaces labeled
+  `opendatahub.io/kueue-managed: "true"` — we deliberately label none, so no
+  default LocalQueues ever exist and no workload can reach it. There is no knob
+  to suppress default creation under `Unmanaged` (empty names fall back to
+  `default`); `Removed` would make RHOAI tear down our Kueue CR. Never label a
+  namespace `opendatahub.io/kueue-managed` unless you want RHOAI's GPU-inclusive
+  defaults active there.
+- `components/instances/rhoai-instance/base/hardwareprofile-kueue-gpu.yaml` /
+  `hardwareprofile-kueue-cpu.yaml` — HardwareProfiles with `scheduling.type: Queue`
+  (v1 API enum is `Node`/`Queue`) + `kueue.localQueueName: gpu` / `default`, in
+  `redhat-ods-applications` (consumable from any namespace via the
+  `opendatahub.io/hardware-profile-namespace` annotation).
+- `maas-models/*/llm/model.yaml` carry
+  `opendatahub.io/hardware-profile-name: kueue-gpu` (GPU models) / `kueue-cpu`
+  (simulator) + `opendatahub.io/hardware-profile-namespace` annotations. The
+  odh-operator's hardwareprofile mutating webhook reads these and adds
+  `kueue.x-k8s.io/queue-name: gpu` / `default` to the workload — do not add the
+  queue label by hand; if the webhook doesn't fire on a nightly, that's a bug to
+  file (docs/issues/), not a reason to inline the label.
+
+### Verification commands
+
+```bash
+oc get csv -n openshift-kueue-operator                       # kueue-operator CSV Succeeded
+oc get kueue cluster -o jsonpath='{.status.conditions}'      # Kueue CR available
+oc get clusterqueue rhoai-cpu rhoai-gpu -o jsonpath='{.status.conditions}'   # Active
+oc get resourceflavor,lq -A                                  # l40s/default + LocalQueues
+oc get datasciencecluster default-dsc -o jsonpath='{.status.components.kueue}'
+oc get lminferenceservice -n llm --show-labels | grep queue-name   # webhook fired
+oc get workloads -n llm                                      # Kueue Workloads admitted
 ```
 
 ## Script Implementation Details

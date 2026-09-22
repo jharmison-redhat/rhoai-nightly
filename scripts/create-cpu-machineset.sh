@@ -13,7 +13,7 @@
 #   --replicas N           Number of replicas (default: 2)
 #   --az ZONE              Availability zone (default: auto-detected)
 #   --volume-size GB       Root volume size in GB (default: 120)
-#   --min N                Minimum replicas for autoscaling (default: 1)
+#   --min N                Minimum replicas for autoscaling (default: 2)
 #   --max N                Maximum replicas for autoscaling (default: 3)
 #   --dry-run              Preview without applying
 #
@@ -33,7 +33,7 @@ INSTANCE_TYPE="${CPU_INSTANCE_TYPE:-${INSTANCE_TYPE:-m6a.4xlarge}}"
 REPLICAS="${CPU_REPLICAS:-${REPLICAS:-1}}"
 AZ="${CPU_AZ:-}"
 VOLUME_SIZE="${CPU_VOLUME_SIZE:-${VOLUME_SIZE:-120}}"
-AUTOSCALE_MIN="${CPU_MIN:-1}"
+AUTOSCALE_MIN="${CPU_MIN:-2}"
 AUTOSCALE_MAX="${CPU_MAX:-3}"
 DRY_RUN=false
 
@@ -57,7 +57,7 @@ Options:
   --replicas N           Number of replicas (default: 1)
   --az ZONE              Availability zone (default: auto-detected)
   --volume-size GB       Root volume size in GB (default: 120)
-  --min N                Minimum replicas for autoscaling (default: 1)
+  --min N                Minimum replicas for autoscaling (default: 2)
   --max N                Maximum replicas for autoscaling (default: 3)
   --dry-run              Preview without applying
 

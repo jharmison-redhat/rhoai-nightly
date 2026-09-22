@@ -34,6 +34,7 @@ SYNC_ORDER=(
 
     # Phase 2: Dependent Operators
     "kueue-operator"
+    "instance-kueue"
     "leader-worker-set"
     "instance-lws"
     "jobset-operator"
@@ -90,6 +91,7 @@ get_required_crd() {
         instance-lws)     echo "leaderworkersetoperators.operator.openshift.io" ;;
         instance-jobset)  echo "jobsetoperators.operator.openshift.io" ;;
         instance-kuadrant) echo "kuadrants.kuadrant.io" ;;
+        instance-kueue)   echo "kueues.kueue.openshift.io" ;;
         instance-rhoai)   echo "datascienceclusters.datasciencecluster.opendatahub.io" ;;
         *)                echo "" ;;
     esac

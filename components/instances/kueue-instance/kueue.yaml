@@ -1,0 +1,29 @@
+apiVersion: kueue.openshift.io/v1
+kind: Kueue
+metadata:
+  name: cluster
+spec:
+  managementState: Managed
+  logLevel: Normal
+  operatorLogLevel: Normal
+  config:
+    gangScheduling:
+      policy: ByWorkload
+      byWorkload:
+        admission: Parallel
+    preemption:
+      preemptionPolicy: FairSharing
+    integrations:
+      frameworks:
+        - BatchJob
+        - Job
+        - JobSet
+        - Pod
+        - Deployment
+        - StatefulSet
+        - RayJob
+        - RayCluster
+        - PyTorchJob
+        - LeaderWorkerSet
+    workloadManagement:
+      labelPolicy: ""

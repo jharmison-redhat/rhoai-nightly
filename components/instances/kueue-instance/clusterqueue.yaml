@@ -7,6 +7,7 @@ spec:
   preemption:
     borrowWithinCohort:
       policy: LowerPriority
+    reclaimWithinCohort: Any
   resourceGroups:
     - coveredResources:
         - cpu
@@ -28,6 +29,7 @@ spec:
   preemption:
     borrowWithinCohort:
       policy: LowerPriority
+    reclaimWithinCohort: Any
   resourceGroups:
     - coveredResources:
         - cpu

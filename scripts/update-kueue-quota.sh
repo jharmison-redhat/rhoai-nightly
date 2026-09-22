@@ -7,9 +7,9 @@
 # The Cohort's /spec/resourceGroups is covered by ignoreDifferences on the
 # instance-kueue Application, so this patch survives ArgoCD. Git holds the
 # defaults for this cluster's shape; run this to resize for a different
-# cluster. Re-run after 'make refresh-apps' — an explicit sync resets quota to
-# the git defaults (auto-sync/selfHeal never does; ignored diffs are not acted
-# on).
+# cluster. 'make refresh-apps' runs this automatically after its syncs (an
+# explicit sync resets quota to the git defaults; auto-sync/selfHeal never
+# does — ignored diffs are not acted on).
 #
 # Inputs (.env, exported by the Makefile):
 #   CPU_INSTANCE_TYPE (default: m6a.4xlarge)   CPU_MAX (default: 3)
@@ -112,10 +112,18 @@ if oc get application "$APP_NAME" -n openshift-gitops >/dev/null 2>&1; then
     fi
 fi
 
-if ! oc get cohorts.kueue.x-k8s.io "$COHORT_NAME" >/dev/null 2>&1; then
-    log_error "Cohort '$COHORT_NAME' not found — sync instance-kueue first (make refresh-apps)"
-    exit 1
-fi
+wait_start=$(date +%s)
+while ! oc get cohorts.kueue.x-k8s.io "$COHORT_NAME" >/dev/null 2>&1; do
+    elapsed=$(($(date +%s) - wait_start))
+    if [ $elapsed -ge 120 ]; then
+        log_warn "Cohort '$COHORT_NAME' not found after 120s — quota left at git defaults."
+        log_warn "Re-run 'make kueue-quota' once instance-kueue is Synced (make status)."
+        exit 0
+    fi
+    printf "  Waiting for Cohort '%s' (%ds)...\r" "$COHORT_NAME" "$elapsed"
+    sleep 5
+done
+echo ""
 
 oc patch cohorts.kueue.x-k8s.io "$COHORT_NAME" --type=merge -p "{\"spec\":{\"resourceGroups\":[{\"coveredResources\":[\"cpu\",\"memory\"],\"flavors\":[{\"name\":\"default\",\"resources\":[{\"name\":\"cpu\",\"nominalQuota\":\"${QUOTA_CPU}\"},{\"name\":\"memory\",\"nominalQuota\":\"${QUOTA_MEM}Gi\"}]}]},{\"coveredResources\":[\"nvidia.com/gpu\"],\"flavors\":[{\"name\":\"l40s\",\"resources\":[{\"name\":\"nvidia.com/gpu\",\"nominalQuota\":\"${QUOTA_GPU}\"}]}]}]}}"
 

@@ -266,9 +266,11 @@ sync-enable:
 
 # Refresh from git AND sync all RHOAI apps (one-time, does not change auto-sync setting)
 # Use when auto-sync is disabled and you want to apply latest from git.
-# Scopes to ApplicationSet-owned apps (see RHOAI_APPS) and runs in parallel —
-# out-of-band apps (instance-maas, instance-evalhub, ...) are managed by their
-# own scripts and are left alone.
+# Scopes to ApplicationSet-owned apps + cluster-config (see RHOAI_APPS) and runs
+# in parallel — out-of-band apps (instance-maas, instance-evalhub, ...) are
+# managed by their own scripts and are left alone.
+# The explicit sync operations reset the Cohort quota to the git defaults
+# (ignoreDifferences protects against selfHeal, not syncs), so re-size after.
 refresh-apps:
 	@echo "Refreshing RHOAI apps from git (parallel)..."
 	@$(RHOAI_APPS) | xargs -P 8 -I {} oc annotate {} -n openshift-gitops argocd.argoproj.io/refresh=hard --overwrite
@@ -276,6 +278,7 @@ refresh-apps:
 	@$(RHOAI_APPS) | xargs -P 8 -I {} oc patch {} -n openshift-gitops --type=merge \
 	  -p '{"operation":{"initiatedBy":{"username":"make"},"sync":{"prune":true}}}'
 	@echo "All RHOAI apps refreshed and syncing."
+	@$(MAKE) --no-print-directory kueue-quota
 
 # Remove worker role from master nodes (run after workers are Ready)
 dedicate-masters:

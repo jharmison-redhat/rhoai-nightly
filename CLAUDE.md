@@ -946,9 +946,9 @@ webhook) and is NOT allowed to manage Kueue itself:
     allocatable, static fallback for fresh installs) and `oc patch`es the
     Cohort. The Cohort's `/spec/resourceGroups` is covered by
     `ignoreDifferences` on the instance-kueue Application, so auto-sync never
-    clobbers it — but an explicit sync (`make refresh-apps`) resets quota to
-    the git defaults, so re-run `make kueue-quota` after one. Git holds this
-    cluster's shape as the default.
+    clobbers it — an explicit sync (`make refresh-apps`) resets quota to the
+    git defaults, so `refresh-apps` runs `kueue-quota` automatically at the
+    end. Git holds this cluster's shape as the default.
   - LocalQueues, **`default` is always CPU-only** (→ `rhoai-cpu`); GPU queuing is
     opt-in via the explicitly named `gpu` LocalQueue (→ `rhoai-gpu`):
     - `llm`: `default` + `gpu` (in kueue-instance, which owns the namespace)

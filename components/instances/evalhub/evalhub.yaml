@@ -12,4 +12,4 @@ spec:
     type: sqlite
   env:
     - name: MLFLOW_TRACKING_URI
-      value: https://mlflow.redhat-ods-applications.svc.cluster.local:8443
+      value: https://mlflow.redhat-ods-applications.svc.cluster.local:8443/mlflow

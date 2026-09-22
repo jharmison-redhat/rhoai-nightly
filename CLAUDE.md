@@ -895,10 +895,11 @@ webhook) and is NOT allowed to manage Kueue itself:
 - `components/instances/kueue-instance/` — `instance-kueue` ApplicationSet element:
   - `Kueue/cluster` CR (kueue.openshift.io/v1) with the workload integrations:
     gangScheduling ByWorkload (Parallel admission), FairSharing preemption, and
-    `integrations.frameworks` covering BatchJob, Job, JobSet, Pod, Deployment,
+    `integrations.frameworks` covering BatchJob, JobSet, Pod, Deployment,
     StatefulSet, RayJob, RayCluster, PyTorchJob, LeaderWorkerSet (kserve serving
     pods are Deployments; ray/trainingoperator/jobset/lws are the other controllers
-    in play in this repo).
+    in play in this repo; batch/v1 Job is covered by `BatchJob` — the literal
+    `Job` framework name is not in the RHBK CRD enum and rejects the CR).
   - `Namespace/llm` labeled `kueue.openshift.io/managed: "true"`.
   - `ResourceFlavor/default` (any node) + `ResourceFlavor/l40s`
     (node-role.kubernetes.io/gpu + nvidia.com/gpu toleration — matches our GPU

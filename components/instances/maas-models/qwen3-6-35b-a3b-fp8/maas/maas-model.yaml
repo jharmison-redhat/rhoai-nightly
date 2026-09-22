@@ -1,0 +1,12 @@
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSModelRef
+metadata:
+  name: qwen3-6-35b-a3b-fp8
+  namespace: llm
+  annotations:
+    openshift.io/display-name: "Red Hat AI Qwen3.6-35B-A3B FP8"
+    openshift.io/description: "Red Hat AI Qwen3.6-35B-A3B FP8 (MoE, gated-delta-net hybrid) on vLLM with NVIDIA GPU"
+spec:
+  modelRef:
+    kind: LLMInferenceService
+    name: qwen3-6-35b-a3b-fp8

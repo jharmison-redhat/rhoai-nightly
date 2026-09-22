@@ -271,6 +271,7 @@ make observability-uninstall # Reverse-flip instance-rhoai to overlays/maas; mon
 Available models:
 - `simulator` — CPU-only mock (~256Mi RAM, no real LLM)
 - `qwen3-6-27b-fp8` — Red Hat AI Qwen3-6-27B FP8 on RHAIIS 3.5.1 (1 L40S-class GPU, 60Gi RAM)
+- `qwen3-6-35b-a3b-fp8` — Red Hat AI Qwen3.6-35B-A3B FP8 dynamic (gated-delta-net MoE, 3B active) on vLLM GPU (1 L40S-class GPU, 60Gi RAM, 32k context)
 - `granite-tiny-gpu` — RedHatAI Granite 4.0-h-tiny FP8 on vLLM GPU (1 GPU, 24Gi RAM)
 
 Each model gets free tier (50000 tokens/min, all authenticated users) and premium tier (100000 tokens/min, all authenticated users) via a single **unified pair** of MaaSSubscriptions (`all-models-free`, `all-models-premium`) plus `MaaSAuthPolicy/all-models-access` in `models-as-a-service` — there are no per-model subscription/auth-policy manifests. Their `modelRefs[]` cover every registered model (including external ones) and are enumerated from **live cluster state** by `scripts/setup-maas-subscriptions.sh` (`make maas-subscriptions`, also called automatically by every model deploy/delete): deploying a model folds it in, deleting one drops it out. With zero registered models the sync is a no-op (the CRDs require ≥1 modelRef).

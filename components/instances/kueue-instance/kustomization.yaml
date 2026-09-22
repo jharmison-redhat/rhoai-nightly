@@ -8,5 +8,6 @@ resources:
   - kueue.yaml
   - namespace-llm.yaml
   - resourceflavors.yaml
+  - cohort.yaml
   - clusterqueue.yaml
   - localqueue.yaml

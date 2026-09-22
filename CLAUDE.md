@@ -96,7 +96,7 @@ rhoai-nightly/
 │       ├── jobset-instance/             # JobSet config
 │       ├── leader-worker-set-instance/  # Leader-Worker config
 │       ├── connectivity-link-instance/  # Connectivity Link config
-│       ├── kueue-instance/              # Kueue CR + ClusterQueues/ResourceFlavors (llm ns)
+│       ├── kueue-instance/              # Kueue CR + Cohort/ClusterQueues/ResourceFlavors (llm ns)
 │       ├── maas-instance/               # MaaS Helm chart (PostgreSQL+PVC, Gateway)
 │       ├── maas-observability/          # MaaS observability (TelemetryPolicy + Istio Telemetry)
 │       ├── evalhub/                     # EvalHub + MLflow + DSPA (make evalhub)
@@ -904,12 +904,27 @@ webhook) and is NOT allowed to manage Kueue itself:
   - `ResourceFlavor/default` (any node) + `ResourceFlavor/l40s`
     (node-role.kubernetes.io/gpu + nvidia.com/gpu toleration — matches our GPU
     MachineSet).
-  - Two ClusterQueues, quotas aligned to **provisionable** resources
-    (MachineAutoscaler max 3 workers / 3 GPUs):
-    - `rhoai-cpu`: 48 cpu / 192Gi (3 × m6a.4xlarge) — cpu/memory only.
-    - `rhoai-gpu`: 24 cpu / 96Gi (3 × g6e.2xlarge) + 3 GPUs (flavor `l40s`).
-    Quota > steady-state is intentional: admitted pods briefly sit unschedulable
-    and drive the autoscaler up to the max.
+  - Two ClusterQueues in an **explicit `Cohort/rhoai`** — all quota lives on
+    the Cohort; the ClusterQueues are borrowing-only (`nominalQuota: "0"` —
+    CRD-required, cannot be omitted):
+    - `Cohort/rhoai`: cpu/memory on flavor `default` + GPUs on flavor `l40s`,
+      sized to the whole provisionable worker fleet (this cluster: 72 cpu /
+      288Gi / 3 GPUs). `make kueue-quota` resizes it (see below).
+    - `rhoai-cpu`: declares `[cpu, memory]`/`default` — can borrow only those.
+    - `rhoai-gpu`: declares `[cpu, memory]`/`default` **plus**
+      `[nvidia.com/gpu]`/`l40s` — the only queue that can touch GPU quota.
+    - Both: `preemption.borrowWithinCohort: LowerPriority` (the enum is only
+      `Never`/`LowerPriority`); no `borrowingLimit` — each borrows up to the
+      cohort pool, FairSharing preemption (Kueue CR) arbitrates between them.
+  - **Quota sizing is per-cluster, managed outside GitOps** by
+    `make kueue-quota` (`scripts/update-kueue-quota.sh`): computes the cohort
+    quota from provisionable capacity (autoscaler MAX × live per-node
+    allocatable, static fallback for fresh installs) and `oc patch`es the
+    Cohort. The Cohort's `/spec/resourceGroups` is covered by
+    `ignoreDifferences` on the instance-kueue Application, so auto-sync never
+    clobbers it — but an explicit sync (`make refresh-apps`) resets quota to
+    the git defaults, so re-run `make kueue-quota` after one. Git holds this
+    cluster's shape as the default.
   - LocalQueues, **`default` is always CPU-only** (→ `rhoai-cpu`); GPU queuing is
     opt-in via the explicitly named `gpu` LocalQueue (→ `rhoai-gpu`):
     - `llm`: `default` + `gpu` (in kueue-instance, which owns the namespace)
@@ -950,11 +965,13 @@ webhook) and is NOT allowed to manage Kueue itself:
 ```bash
 oc get csv -n openshift-kueue-operator                       # kueue-operator CSV Succeeded
 oc get kueue cluster -o jsonpath='{.status.conditions}'      # Kueue CR available
+oc get cohorts.kueue.x-k8s.io rhoai -o jsonpath='{.status.conditions}'   # Cohort active
 oc get clusterqueue rhoai-cpu rhoai-gpu -o jsonpath='{.status.conditions}'   # Active
 oc get resourceflavor,lq -A                                  # l40s/default + LocalQueues
 oc get datasciencecluster default-dsc -o jsonpath='{.status.components.kueue}'
 oc get lminferenceservice -n llm --show-labels | grep queue-name   # webhook fired
 oc get workloads -n llm                                      # Kueue Workloads admitted
+make kueue-quota                                             # resize Cohort quota (per-cluster)
 ```
 
 ## Script Implementation Details

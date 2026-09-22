@@ -9,7 +9,7 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
-.PHONY: help gpu cpu icsp uwm setup infra secrets gitops deploy bootstrap status all clean undeploy configure-repo scale refresh restart-catalog sync sync-app sync-disable sync-enable refresh-apps dedicate-masters maas maas-uninstall maas-verify maas-model maas-model-status maas-model-delete observability observability-uninstall evalhub evalhub-uninstall autorag autorag-uninstall diagnose compare cleanup-projects preflight validate-config
+.PHONY: help gpu cpu icsp uwm setup infra secrets gitops deploy bootstrap status all clean undeploy configure-repo scale refresh restart-catalog sync sync-app sync-disable sync-enable refresh-apps dedicate-masters maas maas-uninstall maas-verify maas-model maas-model-status maas-model-delete observability observability-uninstall evalhub evalhub-uninstall autorag autorag-uninstall diagnose compare cleanup-projects preflight validate-config kueue-quota
 
 # Applications owned by our two ApplicationSets. Excludes out-of-band apps
 # managed by their own scripts (instance-maas, instance-maas-observability,
@@ -209,6 +209,12 @@ configure-repo:
 # Scale a MachineSet
 scale:
 	@scripts/scale-machineset.sh --name "$(NAME)" --replicas "$(REPLICAS)"
+
+# Size the Kueue Cohort quota from the cluster's provisionable capacity
+# (outside GitOps — survives ArgoCD via ignoreDifferences; re-run after
+# make refresh-apps, which resets quota to the git defaults)
+kueue-quota:
+	@scripts/update-kueue-quota.sh
 
 # GitOps refresh - pull latest from git without triggering sync
 # Use this to update ArgoCD's view of git state

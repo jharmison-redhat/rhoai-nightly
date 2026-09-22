@@ -4,9 +4,10 @@ Deploy Red Hat OpenShift AI (RHOAI) 3.x **nightly** builds onto an OpenShift clu
 using GitOps (ArgoCD). One `make` command — or one Claude Code skill — takes a bare
 cluster to a fully synced RHOAI install, with optional Models-as-a-Service (MaaS),
 observability, Eval Hub, and AutoML/AutoRAG (Tech Preview). Kueue job queueing
-(two ClusterQueues aligned to the provisionable nodes, CPU-only `default`
-LocalQueues plus opt-in `gpu` queues, Kueue-scheduled HardwareProfiles) ships
-enabled with the install.
+(explicit Cohort holding all quota sized to the provisionable worker fleet,
+borrowing-only ClusterQueues, CPU-only `default` LocalQueues plus opt-in `gpu`
+queues, Kueue-scheduled HardwareProfiles) ships enabled with the install —
+`make kueue-quota` resizes the quota for a different cluster.
 
 ## How it works
 

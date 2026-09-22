@@ -83,6 +83,10 @@ spec:
           kind: ClusterPolicy
           jsonPointers:
             - /spec/driver/licensingConfig/secretName
+        - group: kueue.x-k8s.io
+          kind: Cohort
+          jsonPointers:
+            - /spec/resourceGroups
       source:
         repoURL: https://github.com/jharmison-redhat/rhoai-nightly
         targetRevision: cluster/nga

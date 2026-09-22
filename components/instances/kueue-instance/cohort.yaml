@@ -1,0 +1,23 @@
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: Cohort
+metadata:
+  name: rhoai
+spec:
+  resourceGroups:
+    - coveredResources:
+        - cpu
+        - memory
+      flavors:
+        - name: default
+          resources:
+            - name: cpu
+              nominalQuota: "72"
+            - name: memory
+              nominalQuota: "288Gi"
+    - coveredResources:
+        - nvidia.com/gpu
+      flavors:
+        - name: l40s
+          resources:
+            - name: nvidia.com/gpu
+              nominalQuota: "3"

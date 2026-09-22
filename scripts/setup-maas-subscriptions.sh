@@ -83,8 +83,10 @@ oc create namespace models-as-a-service --dry-run=client -o yaml | oc apply -f -
 
 log_info "Found $COUNT MaaSModelRef(s), building modelRefs..."
 
-# Subscriptions carry per-model rate limits; the auth policy does not.
-SUB_REFS=$(echo "$REFS_JSON" | jq -c '[.items[] | {name: .metadata.name, namespace: .metadata.namespace, tokenRateLimits: [{limit: 50000, window: "1m"}]}]')
+# Subscriptions carry per-model rate limits (free and premium differ); the
+# auth policy does not.
+FREE_REFS=$(echo "$REFS_JSON" | jq -c '[.items[] | {name: .metadata.name, namespace: .metadata.namespace, tokenRateLimits: [{limit: 50000, window: "1m"}]}]')
+PREMIUM_REFS=$(echo "$REFS_JSON" | jq -c '[.items[] | {name: .metadata.name, namespace: .metadata.namespace, tokenRateLimits: [{limit: 100000, window: "1m"}]}]')
 AUTH_REFS=$(echo "$REFS_JSON" | jq -c '[.items[] | {name: .metadata.name, namespace: .metadata.namespace}]')
 
 # =============================================================================
@@ -105,7 +107,7 @@ spec:
     groups:
       - name: system:authenticated
     users: []
-  modelRefs: ${SUB_REFS}
+  modelRefs: ${FREE_REFS}
   priority: 10
 EOF
 
@@ -124,7 +126,7 @@ spec:
     groups:
       - name: system:authenticated
     users: []
-  modelRefs: ${SUB_REFS}
+  modelRefs: ${PREMIUM_REFS}
   priority: 20
 EOF
 

@@ -906,7 +906,10 @@ webhook) and is NOT allowed to manage Kueue itself:
     MachineSet).
   - Two ClusterQueues in an **explicit `Cohort/rhoai`** — all quota lives on
     the Cohort; the ClusterQueues are borrowing-only (`nominalQuota: "0"` —
-    CRD-required, cannot be omitted):
+    CRD-required, cannot be omitted). **Manifests are `kueue.x-k8s.io/v1beta2`**
+    (the storage version): v1beta1's `spec.cohort` field does not convert to
+    v1beta2 and is silently pruned — membership must be `spec.cohortName` on
+    v1beta2 objects.
     - `Cohort/rhoai`: cpu/memory on flavor `default` + GPUs on flavor `l40s`,
       sized to the whole provisionable worker fleet (this cluster: 72 cpu /
       288Gi / 3 GPUs). `make kueue-quota` resizes it (see below).

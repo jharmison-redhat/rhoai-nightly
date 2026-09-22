@@ -219,6 +219,13 @@ make sync-enable     # Re-enable ArgoCD auto-sync
 make refresh-apps    # Refresh from git AND sync all apps (one-time)
                      # Use when auto-sync is disabled to apply latest from git
 
+# NOTE: refresh, refresh-apps, sync-disable and sync-enable scope to
+# ApplicationSet-owned RHOAI apps (ownerReferences to our two ApplicationSets,
+# the `RHOAI_APPS` jq filter in the Makefile) and run in parallel (xargs -P).
+# Out-of-band apps (instance-maas, instance-maas-observability, instance-evalhub,
+# instance-autorag — managed by their own scripts) and other GitOps stacks
+# sharing the ArgoCD namespace (cert-manager, oauth, ...) are NOT touched.
+
 make scale NAME=<machineset> REPLICAS=<N|+N|-N>
                      # Scale a MachineSet
                      # Examples:

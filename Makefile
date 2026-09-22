@@ -11,6 +11,14 @@ endif
 
 .PHONY: help gpu cpu icsp uwm setup infra secrets gitops deploy bootstrap status all clean undeploy configure-repo scale refresh restart-catalog sync sync-app sync-disable sync-enable refresh-apps dedicate-masters maas maas-uninstall maas-verify maas-model maas-model-status maas-model-delete observability observability-uninstall evalhub evalhub-uninstall autorag autorag-uninstall diagnose compare cleanup-projects preflight validate-config
 
+# Applications owned by our two ApplicationSets. Excludes out-of-band apps
+# managed by their own scripts (instance-maas, instance-maas-observability,
+# instance-evalhub, instance-autorag) and other GitOps stacks sharing this
+# ArgoCD namespace (cert-manager, oauth, cluster-config, app-of-apps) —
+# they carry no ownerReferences to our ApplicationSets.
+RHOAI_APPS = oc get applications.argoproj.io -n openshift-gitops -o json | \
+	jq -r '.items[] | select((.metadata.ownerReferences // []) | any(.kind == "ApplicationSet" and (.name == "cluster-operators-applicationset" or .name == "cluster-oper-instances-applicationset"))) | "application.argoproj.io/" + .metadata.name'
+
 # Default target - run everything
 .DEFAULT_GOAL := all
 
@@ -55,13 +63,13 @@ help:
 	@echo "  make preflight      - Quick readiness check (pass/warn/fail)"
 	@echo "  make validate-config - Validate .env against cluster capabilities"
 	@echo "  make status         - Show ArgoCD application status"
-	@echo "  make refresh        - Refresh all apps from git (hard refresh, no sync)"
+	@echo "  make refresh        - Refresh RHOAI apps from git (hard refresh, no sync, parallel)"
 	@echo "  make restart-catalog - Restart catalog pod and operator (force image pull)"
 	@echo ""
 	@echo "ArgoCD Sync Control:"
-	@echo "  make sync-disable - Disable auto-sync on all apps (for manual changes)"
-	@echo "  make sync-enable  - Re-enable auto-sync on all apps"
-	@echo "  make refresh-apps - Refresh and sync all apps (one-time, keeps current sync setting)"
+	@echo "  make sync-disable - Disable auto-sync on RHOAI apps (for manual changes)"
+	@echo "  make sync-enable  - Re-enable auto-sync on RHOAI apps"
+	@echo "  make refresh-apps - Refresh and sync RHOAI apps (one-time, keeps current sync setting)"
 	@echo ""
 	@echo "MaaS (Models as a Service):"
 	@echo "  make maas           - Install MaaS platform (PostgreSQL+PVC, Gateway, Authorino TLS)"
@@ -204,11 +212,11 @@ scale:
 
 # GitOps refresh - pull latest from git without triggering sync
 # Use this to update ArgoCD's view of git state
+# Scopes to ApplicationSet-owned apps (see RHOAI_APPS) and runs in parallel.
 refresh:
-	@echo "Refreshing all apps from git (hard refresh)..."
-	@oc get applications.argoproj.io -n openshift-gitops -o name | \
-	  xargs -I {} oc annotate {} -n openshift-gitops argocd.argoproj.io/refresh=hard --overwrite
-	@echo "All apps refreshed from git."
+	@echo "Refreshing RHOAI apps from git (hard refresh, parallel)..."
+	@$(RHOAI_APPS) | xargs -P 8 -I {} oc annotate {} -n openshift-gitops argocd.argoproj.io/refresh=hard --overwrite
+	@echo "All RHOAI apps refreshed from git."
 	@echo "Apps will show OutOfSync if git differs from cluster."
 	@echo "Run 'make sync' to apply changes, or 'make status' to check."
 
@@ -235,30 +243,31 @@ sync-app:
 	  argocd.argoproj.io/refresh=normal --overwrite
 	@echo "Sync enabled and triggered for $(APP)"
 
-# Disable auto-sync on all ArgoCD applications
+# Disable auto-sync on ApplicationSet-owned RHOAI apps (for manual changes)
 sync-disable:
-	@echo "Disabling auto-sync on all ArgoCD applications..."
-	@oc get applications.argoproj.io -n openshift-gitops -o name | xargs -I {} oc patch {} -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+	@echo "Disabling auto-sync on RHOAI apps (parallel)..."
+	@$(RHOAI_APPS) | xargs -P 8 -I {} oc patch {} -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
 	@echo "Auto-sync disabled. You can now make manual changes."
 	@echo "Re-enable with: make sync-enable"
 
-# Re-enable auto-sync on all ArgoCD applications
+# Re-enable auto-sync on ApplicationSet-owned RHOAI apps
 sync-enable:
-	@echo "Re-enabling auto-sync on all ArgoCD applications..."
-	@oc get applications.argoproj.io -n openshift-gitops -o name | xargs -I {} oc patch {} -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
+	@echo "Re-enabling auto-sync on RHOAI apps (parallel)..."
+	@$(RHOAI_APPS) | xargs -P 8 -I {} oc patch {} -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
 	@echo "Auto-sync re-enabled."
 
-# Refresh from git AND sync all apps (one-time, does not change auto-sync setting)
-# Use when auto-sync is disabled and you want to apply latest from git
+# Refresh from git AND sync all RHOAI apps (one-time, does not change auto-sync setting)
+# Use when auto-sync is disabled and you want to apply latest from git.
+# Scopes to ApplicationSet-owned apps (see RHOAI_APPS) and runs in parallel —
+# out-of-band apps (instance-maas, instance-evalhub, ...) are managed by their
+# own scripts and are left alone.
 refresh-apps:
-	@echo "Refreshing all apps from git..."
-	@oc get applications.argoproj.io -n openshift-gitops -o name | \
-	  xargs -I {} oc annotate {} -n openshift-gitops argocd.argoproj.io/refresh=hard --overwrite
-	@echo "Triggering sync on all apps..."
-	@oc get applications.argoproj.io -n openshift-gitops -o name | \
-	  xargs -I {} oc patch {} -n openshift-gitops --type=merge \
-	    -p '{"operation":{"initiatedBy":{"username":"make"},"sync":{"prune":true}}}'
-	@echo "All apps refreshed and syncing."
+	@echo "Refreshing RHOAI apps from git (parallel)..."
+	@$(RHOAI_APPS) | xargs -P 8 -I {} oc annotate {} -n openshift-gitops argocd.argoproj.io/refresh=hard --overwrite
+	@echo "Triggering sync on RHOAI apps (parallel)..."
+	@$(RHOAI_APPS) | xargs -P 8 -I {} oc patch {} -n openshift-gitops --type=merge \
+	  -p '{"operation":{"initiatedBy":{"username":"make"},"sync":{"prune":true}}}'
+	@echo "All RHOAI apps refreshed and syncing."
 
 # Remove worker role from master nodes (run after workers are Ready)
 dedicate-masters:

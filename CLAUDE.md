@@ -222,7 +222,12 @@ make refresh-apps    # Refresh from git AND sync all apps (one-time)
 # NOTE: refresh, refresh-apps, sync-disable and sync-enable scope to
 # ApplicationSet-owned RHOAI apps (ownerReferences to our two ApplicationSets,
 # the `RHOAI_APPS` jq filter in the Makefile) and run in parallel (xargs -P).
-# Out-of-band apps (instance-maas, instance-maas-observability, instance-evalhub,
+# `cluster-config` — the root app-of-apps created by `make deploy`
+# (scripts/deploy-apps.sh) that owns those two ApplicationSets — is included
+# by name as a one-app exception to the filter, so its syncPolicy and the
+# ApplicationSet objects it manages stay aligned with git (it needs the
+# exception because, as the parent, it has no ownerReferences). Out-of-band
+# apps (instance-maas, instance-maas-observability, instance-evalhub,
 # instance-autorag — managed by their own scripts) and other GitOps stacks
 # sharing the ArgoCD namespace (cert-manager, oauth, ...) are NOT touched.
 

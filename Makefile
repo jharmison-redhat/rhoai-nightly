@@ -9,7 +9,7 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
-.PHONY: help gpu cpu icsp uwm setup infra secrets gitops deploy bootstrap status all clean undeploy configure-repo scale refresh restart-catalog sync sync-app sync-disable sync-enable refresh-apps dedicate-masters maas maas-uninstall maas-verify maas-model maas-model-status maas-model-delete observability observability-uninstall evalhub evalhub-uninstall autorag autorag-uninstall diagnose compare cleanup-projects preflight validate-config kueue-quota
+.PHONY: help gpu cpu icsp uwm setup infra secrets gitops deploy bootstrap status all clean undeploy configure-repo scale refresh restart-catalog sync sync-app sync-disable sync-enable refresh-apps dedicate-masters maas maas-uninstall maas-verify maas-model maas-model-status maas-model-delete maas-external-model maas-external-model-delete observability observability-uninstall evalhub evalhub-uninstall autorag autorag-uninstall diagnose compare cleanup-projects preflight validate-config kueue-quota
 
 # Applications owned by our two ApplicationSets, plus `cluster-config` (the
 # root app-of-apps that owns those ApplicationSets — included by name so the
@@ -81,6 +81,10 @@ help:
 	@echo "                                 Default 'auto' picks by GPU VRAM: >=40Gi->qwen3-6-27b-fp8, GPU<40Gi->granite-tiny-gpu, no GPU->simulator"
 	@echo "  make maas-model-status - Show deployed model status"
 	@echo "  make maas-model-delete [MODEL=qwen3-6-27b-fp8] - Remove a deployed model"
+	@echo "  make maas-external-model - Register external model via MaaS External Models APIs (3.5+)"
+	@echo "                             Requires MAAS_EXTERNAL_ENDPOINT, MAAS_EXTERNAL_MODEL,"
+	@echo "                             MAAS_EXTERNAL_API_KEY in .env (MAAS_EXTERNAL_PATH optional)"
+	@echo "  make maas-external-model-delete - Remove the external model"
 	@echo "  make maas-verify    - Verify MaaS (deploy simulator, test API, auth, rate limits)"
 	@echo "  make maas-uninstall - Remove MaaS resources created by install-maas.sh"
 	@echo "  make observability  - (Re-)install MaaS observability only (UWM + monitors + Kuadrant)"
@@ -311,6 +315,16 @@ maas-model-status:
 # Usage: make maas-model-delete [MODEL=qwen3-6-27b-fp8|granite-tiny-gpu|simulator|all]
 maas-model-delete:
 	@scripts/setup-maas-model.sh --delete $(or $(MODEL),)
+
+# Register external model via MaaS External Models APIs (RHOAI 3.5+)
+# Requires MAAS_EXTERNAL_ENDPOINT, MAAS_EXTERNAL_MODEL, MAAS_EXTERNAL_API_KEY
+# in .env (MAAS_EXTERNAL_PATH optional) — see .env.example
+maas-external-model:
+	@scripts/setup-maas-external-model.sh
+
+# Remove the external model registered by maas-external-model
+maas-external-model-delete:
+	@scripts/setup-maas-external-model.sh --delete
 
 # Verify MaaS deployment (deploy test model, test API, auth, rate limits)
 maas-verify:

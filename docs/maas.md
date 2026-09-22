@@ -78,6 +78,58 @@ make maas-model-delete MODEL=simulator   # delete one
 make maas-model-delete MODEL=all         # delete all
 ```
 
+## External models (RHOAI 3.5+)
+
+Registers a model served by an OpenAI-compatible endpoint on a **remote
+cluster** (e.g. another cluster's MaaS gateway) through the MaaS External
+Models APIs — `ExternalProvider` + `ExternalModel` (both
+`inference.opendatahub.io/v1alpha1`). The MaaS controller creates the
+ExternalName Service, Istio ServiceEntry, and HTTPRoute itself; the Payload
+Processor injects the provider API key and translates requests. Requires
+`make maas` first.
+
+```bash
+make maas-external-model         # deploy
+make maas-external-model-delete  # remove
+```
+
+Configuration in `.env` (see `.env.example`):
+
+```bash
+# Required
+MAAS_EXTERNAL_ENDPOINT=maas.apps.<other-cluster-domain>   # remote gateway FQDN
+MAAS_EXTERNAL_MODEL=gpt-5.6-luna                          # as served remotely
+MAAS_EXTERNAL_API_KEY=...                                 # key minted on the remote cluster
+# Optional
+MAAS_EXTERNAL_PATH=/v1/chat/completions                   # override for non-standard path
+```
+
+**Resource naming is strict.** The client-facing model name — the ExternalModel
+CR name, `spec.modelName`, and MaaSModelRef name — is the **sanitized** model
+name (lowercase, characters outside `[a-z0-9-]` stripped, e.g. `gpt-5.6-luna`
+→ `gpt-56-luna`); clients send it as `model` in chat completions. The raw
+remote name appears only in `spec.externalProviderRefs[].targetModel`. The
+script refuses to overwrite a MaaSModelRef owned by a local model with the
+same client-facing name.
+
+**API key Secret:** the script creates `Secret/openai-api-key` in `llm` from
+`MAAS_EXTERNAL_API_KEY` and labels it `inference.llm-d.ai/ipp-managed=true` —
+without that label the Payload Processor cannot read the key. The key value
+lives in `.env` (gitignored); it is never committed.
+
+Templates live in `components/instances/maas-external-model/` (envsubst-style
+placeholders rendered by the script; not ArgoCD-managed).
+
+Verify:
+
+```bash
+oc get externalmodel,externalprovider,maasmodelref -n llm
+# ExternalModel conditions True + MaaSModelRef phase Ready, then with a MaaS API key:
+curl -sk https://maas.<cluster-domain>/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"<sanitized-name>","messages":[{"role":"user","content":"hello"}]}'
+```
+
 ## Verify
 
 ```bash

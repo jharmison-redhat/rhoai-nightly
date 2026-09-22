@@ -1,0 +1,12 @@
+apiVersion: inference.opendatahub.io/v1alpha1
+kind: ExternalProvider
+metadata:
+  name: openai
+  namespace: llm
+spec:
+  provider: openai
+  endpoint: ${MAAS_EXTERNAL_ENDPOINT}
+  auth:
+    type: apikey
+    secretRef:
+      name: openai-api-key

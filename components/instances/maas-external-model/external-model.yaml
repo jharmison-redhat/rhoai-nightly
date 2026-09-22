@@ -1,0 +1,13 @@
+apiVersion: inference.opendatahub.io/v1alpha1
+kind: ExternalModel
+metadata:
+  name: ${MAAS_EXTERNAL_NAME}
+  namespace: llm
+spec:
+  modelName: ${MAAS_EXTERNAL_NAME}
+  externalProviderRefs:
+    - ref:
+        name: openai
+      targetModel: ${MAAS_EXTERNAL_MODEL}
+      apiFormat: openai-chat
+      path: ${MAAS_EXTERNAL_PATH}

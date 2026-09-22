@@ -1,0 +1,12 @@
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSModelRef
+metadata:
+  name: ${MAAS_EXTERNAL_NAME}
+  namespace: llm
+  annotations:
+    openshift.io/display-name: "${MAAS_EXTERNAL_MODEL}"
+    openshift.io/description: "External model served via MaaS External Models APIs"
+spec:
+  modelRef:
+    kind: ExternalModel
+    name: ${MAAS_EXTERNAL_NAME}

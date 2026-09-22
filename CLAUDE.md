@@ -102,10 +102,11 @@ rhoai-nightly/
 │       ├── evalhub/                     # EvalHub + MLflow + DSPA (make evalhub)
 │       ├── autorag/                     # AutoML/AutoRAG test tenant (DSPA + pgvector, make autorag)
 │       ├── external-secrets-instance/   # External Secrets instance config
-│       └── maas-models/                # MaaS model manifests (kustomize)
-│           ├── simulator/              # CPU-only mock model
-│           ├── qwen3-6-27b-fp8/        # Red Hat AI Qwen3-6-27B FP8 (GPU, RHAIIS)
-│           └── granite-tiny-gpu/       # Granite 4.0-h-tiny FP8 (GPU, vLLM CUDA)
+│       ├── maas-models/                # MaaS model manifests (kustomize)
+│       │   ├── simulator/              # CPU-only mock model
+│       │   ├── qwen3-6-27b-fp8/        # Red Hat AI Qwen3-6-27B FP8 (GPU, RHAIIS)
+│       │   └── granite-tiny-gpu/       # Granite 4.0-h-tiny FP8 (GPU, vLLM CUDA)
+│       └── maas-external-model/        # External model templates (ExternalProvider/ExternalModel, RHOAI 3.5+)
 │
 ├── Makefile                             # Automation targets
 ├── .env.example                         # Configuration template
@@ -255,6 +256,10 @@ make maas-model      # Deploy models (default: auto — inspects cluster GPU VRA
                      # Or set MAAS_MODELS in .env: MAAS_MODELS=qwen3-6-27b-fp8 granite-tiny-gpu
 make maas-model-status # Show deployed model status
 make maas-model-delete # Delete models (same MODEL= or MAAS_MODELS logic)
+make maas-external-model # Register an external model via MaaS External Models APIs (3.5+)
+                         # Requires MAAS_EXTERNAL_ENDPOINT, MAAS_EXTERNAL_MODEL,
+                         # MAAS_EXTERNAL_API_KEY in .env (MAAS_EXTERNAL_PATH optional)
+make maas-external-model-delete # Remove the external model
 make maas-verify     # Full end-to-end verification (deploys temp model, tests, cleans up)
 make maas-uninstall  # Remove MaaS platform (deletes ArgoCD app + secrets + Authorino SSL)
 make observability   # Settle-gate → flip instance-rhoai to overlays/maas-observability
@@ -606,6 +611,33 @@ Models are defined as kustomize manifests in `components/instances/maas-models/`
 - `maas/` — MaaSModelRef + MaaSAuthPolicy + MaaSSubscription (free + premium tiers)
 
 `setup-maas-model.sh` deploys/deletes models using `oc kustomize`. It reads `MAAS_MODELS` from `.env` for model selection (default: **`auto`** — the script inspects GPU VRAM and picks simulator / granite-tiny-gpu / qwen3-6-27b-fp8).
+
+### MaaS External Models (RHOAI 3.5+)
+
+`make maas-external-model` (`scripts/setup-maas-external-model.sh`) registers a
+model served by an OpenAI-compatible endpoint on a remote cluster (e.g. another
+cluster's MaaS gateway) through the ExternalProvider + ExternalModel CRs
+(`inference.opendatahub.io/v1alpha1`; the `maas.opendatahub.io` ExternalModel
+CRD is legacy). The controller creates the ServiceEntry/HTTPRoute itself;
+we write zero networking YAML. Templates (envsubst-style placeholders, not
+ArgoCD-managed) live in `components/instances/maas-external-model/`.
+
+- Requires `make maas` first. Config in `.env`: `MAAS_EXTERNAL_ENDPOINT`
+  (remote gateway FQDN), `MAAS_EXTERNAL_MODEL` (as served remotely),
+  `MAAS_EXTERNAL_API_KEY` (required), `MAAS_EXTERNAL_PATH` (optional, default
+  `/v1/chat/completions`). See `.env.example`.
+- **Naming is strict**: client-facing name (ExternalModel CR name,
+  `spec.modelName`, MaaSModelRef name) = **sanitized** `MAAS_EXTERNAL_MODEL`
+  (lowercase, chars outside `[a-z0-9-]` stripped, e.g. `gpt-5.6-luna` →
+  `gpt-56-luna`); clients send it as `model` in chat completions. The raw name
+  appears only in `targetModel`. The script refuses to clobber a MaaSModelRef
+  owned by a local LLMInferenceService with the same client-facing name.
+- **Secret**: script creates `Secret/openai-api-key` in `llm` from
+  `MAAS_EXTERNAL_API_KEY`, labeled `inference.llm-d.ai/ipp-managed=true` —
+  without that label the Payload Processor cannot read the key.
+- The remote endpoint's cert must be publicly trusted (LE); the script runs a
+  warn-only TLS preflight. If the IPP fails to dial a *valid* endpoint, that's
+  an upstream bug → `docs/issues/`, not a workaround.
 
 ### MaaS Verification
 
@@ -1254,6 +1286,7 @@ oc get mcp  # MachineConfigPool status
 | `scripts/cleanup-stale-projects.sh` | Audit/delete stale dashboard projects (`make cleanup-projects`; audit-only unless `--delete-*`) |
 | `scripts/enable-uwm.sh` | Enable UWM (idempotent merge; --check / --dry-run modes) |
 | `scripts/install-maas.sh` | MaaS install (secrets, ArgoCD app, Authorino). Does NOT install observability |
+| `scripts/setup-maas-external-model.sh` | External model register/delete via ExternalProvider + ExternalModel (3.5+); renders templates from `.env` |
 | `scripts/install-observability.sh` | MaaS observability install/uninstall (UWM, Kuadrant, ServiceMonitors) |
 | `scripts/install-autorag.sh` | AutoML/AutoRAG test-tenant install/uninstall (pg creds, instance-autorag Application) |
 | `scripts/uninstall-maas.sh` | MaaS uninstall (cascade delete + cleanup) |

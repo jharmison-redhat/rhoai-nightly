@@ -12,9 +12,9 @@ spec:
         - name: default
           resources:
             - name: cpu
-              nominalQuota: 48
+              nominalQuota: "48"
             - name: memory
-              nominalQuota: 192Gi
+              nominalQuota: "192Gi"
 ---
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: ClusterQueue
@@ -30,13 +30,13 @@ spec:
         - name: default
           resources:
             - name: cpu
-              nominalQuota: 24
+              nominalQuota: "24"
             - name: memory
-              nominalQuota: 96Gi
+              nominalQuota: "96Gi"
     - coveredResources:
         - nvidia.com/gpu
       flavors:
         - name: l40s
           resources:
             - name: nvidia.com/gpu
-              nominalQuota: 3
+              nominalQuota: "3"

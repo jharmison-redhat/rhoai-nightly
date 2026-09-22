@@ -61,7 +61,8 @@ cpu_to_cores() {
 }
 
 node_capacity() {
-    local type="$1" gpu="$2" sel="node.kubernetes.io/instance-type=$type"
+    local type="$1" gpu="$2"
+    local sel="node.kubernetes.io/instance-type=$type"
     [ "$gpu" = "true" ] && sel="$sel,node-role.kubernetes.io/gpu"
     local cpu mem gpus="0"
     cpu=$(oc get nodes -l "$sel" -o jsonpath='{.items[0].status.allocatable.cpu}' 2>/dev/null || true)
@@ -99,14 +100,15 @@ log_info "Cohort '$COHORT_NAME' quota: ${QUOTA_CPU} cpu / ${QUOTA_MEM}Gi / ${QUO
 log_info "  CPU: ${CPU_MAX}x ${CPU_TYPE} (${CPU_VCPU} cpu/${CPU_MEM}Gi each) + GPU: ${GPU_MAX}x ${GPU_TYPE} (${GPU_VCPU} cpu/${GPU_MEM}Gi/${GPU_PER_NODE} gpu each)"
 
 if oc get application "$APP_NAME" -n openshift-gitops >/dev/null 2>&1; then
-    has=$(oc get application "$APP_NAME" -n openshift-gitops -o json | jq '[.spec.ignoreDifferences[]? | select(.group == "kueue.x-k8s.io" and .kind == "Cohort")] | length')
-    if [ "$has" = "0" ]; then
-        if oc get application "$APP_NAME" -n openshift-gitops -o json | jq -e '.spec.ignoreDifferences' >/dev/null 2>&1; then
-            oc patch application "$APP_NAME" -n openshift-gitops --type=json -p '[{"op":"add","path":"/spec/ignoreDifferences/-","value":{"group":"kueue.x-k8s.io","kind":"Cohort","jqPointers":["/spec/resourceGroups"]}}]' >/dev/null
+    proper=$(oc get application "$APP_NAME" -n openshift-gitops -o json | jq '[.spec.ignoreDifferences[]? | select(.group == "kueue.x-k8s.io" and .kind == "Cohort" and ((.jsonPointers // []) | index("/spec/resourceGroups")))] | length')
+    if [ "$proper" = "0" ]; then
+        broken=$(oc get application "$APP_NAME" -n openshift-gitops -o json | jq '.spec.ignoreDifferences | to_entries[]? | select(.value.group == "kueue.x-k8s.io" and .value.kind == "Cohort") | .key' | head -1)
+        if [ -n "$broken" ]; then
+            oc patch application "$APP_NAME" -n openshift-gitops --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/ignoreDifferences/$broken\",\"value\":{\"group\":\"kueue.x-k8s.io\",\"kind\":\"Cohort\",\"jsonPointers\":[\"/spec/resourceGroups\"]}}]" >/dev/null
         else
-            oc patch application "$APP_NAME" -n openshift-gitops --type=json -p '[{"op":"add","path":"/spec/ignoreDifferences","value":[{"group":"kueue.x-k8s.io","kind":"Cohort","jqPointers":["/spec/resourceGroups"]}]}]' >/dev/null
+            oc patch application "$APP_NAME" -n openshift-gitops --type=json -p '[{"op":"add","path":"/spec/ignoreDifferences/-","value":{"group":"kueue.x-k8s.io","kind":"Cohort","jsonPointers":["/spec/resourceGroups"]}}]' >/dev/null
         fi
-        log_info "Added Cohort ignoreDifferences to the $APP_NAME Application"
+        log_info "Added Cohort ignoreDifferences (jsonPointers) to the $APP_NAME Application"
     fi
 fi
 

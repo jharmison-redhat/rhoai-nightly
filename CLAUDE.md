@@ -250,10 +250,10 @@ make maas            # Install MaaS platform ONLY (secrets, ArgoCD app, Authorin
                      # Does NOT install the observability cascade — run `make observability`
                      # separately once the cluster is healthy.
 make maas-model      # Deploy models (default: auto — inspects cluster GPU VRAM)
-                     # Autodetect rules: no GPU -> simulator; GPU VRAM >=40Gi -> qwen3-6-27b-fp8;
+                     # Autodetect rules: no GPU -> simulator; GPU VRAM >=40Gi -> qwen3-6-35b-a3b-fp8;
                      # otherwise -> granite-tiny-gpu
                      # Override: make maas-model MODEL=simulator
-                     # Or set MAAS_MODELS in .env: MAAS_MODELS=qwen3-6-27b-fp8 granite-tiny-gpu
+                     # Or set MAAS_MODELS in .env: MAAS_MODELS=qwen3-6-35b-a3b-fp8 granite-tiny-gpu
 make maas-model-status # Show deployed model status
 make maas-model-delete # Delete models (same MODEL= or MAAS_MODELS logic)
 make maas-external-model # Register an external model via MaaS External Models APIs (3.5+)

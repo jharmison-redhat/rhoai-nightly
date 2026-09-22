@@ -37,6 +37,7 @@ has regressed — tell the maintainers.
 | Gateway load balancer provisioned half-dead on AWS | ~50% of external MaaS calls hang | not filed (OCPBUGS draft in [issue](issues/gateway-elb-crosszone-blackhole.md)) | [A11](workarounds.md#a11-maas-gateway-elb--enable-cross-zone-load-balancing) |
 | Operators cache a failed dependency probe at startup | API-key creation 500s; components stuck NotReady after install | [RHOAIENG-67925](https://redhat.atlassian.net/browse/RHOAIENG-67925) Backlog | [E1 auto-remedy](workarounds.md#e1-operators-cache-a-dependency-probe-at-startup-and-never-re-check) in the install script |
 | Telemetry label with a bad source silently disables rate limiting | No 429s ever; unlimited usage | [CONNLINK-1300](https://redhat.atlassian.net/browse/CONNLINK-1300) → RHCL 1.4.3 | Safe-labels-only TelemetryPolicy config |
+| Kueue hardcodes a 5m PodsReady timeout (upstream: `gangScheduling.policy: ByWorkload`) → LLM workloads evicted in a loop before the model loads | GPU model pods (30.9 GB modelcar) deleted ~every 5m, LLMInferenceService never Ready | none needed — fix merged upstream ([kueue-operator 2ec61a1](https://github.com/openshift/kueue-operator/commit/2ec61a163a7ec00382251ad8451745e29d16142f), [OCPSTRAT-3301](https://redhat.atlassian.net/browse/OCPSTRAT-3301), **Kueue 1.5**; our `stable-v1.4` tops out at v1.4.2) | [A14](workarounds.md#a14-kueue-cr--gangscheduling-block-removed-operator-hardcodes-a-5m-podsready-timeout) — `gangScheduling` block removed from the Kueue CR (do not re-enable) |
 
 ---
 

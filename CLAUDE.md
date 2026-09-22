@@ -894,12 +894,28 @@ webhook) and is NOT allowed to manage Kueue itself:
   by the cluster-operators ApplicationSet git directory generator.
 - `components/instances/kueue-instance/` — `instance-kueue` ApplicationSet element:
   - `Kueue/cluster` CR (kueue.openshift.io/v1) with the workload integrations:
-    gangScheduling ByWorkload (Parallel admission), FairSharing preemption, and
+    FairSharing preemption and
     `integrations.frameworks` covering BatchJob, JobSet, Pod, Deployment,
     StatefulSet, RayJob, RayCluster, PyTorchJob, LeaderWorkerSet (kserve serving
     pods are Deployments; ray/trainingoperator/jobset/lws are the other controllers
     in play in this repo; batch/v1 Job is covered by `BatchJob` — the literal
     `Job` framework name is not in the RHBK CRD enum and rejects the CR).
+    **No `gangScheduling`** — deliberately removed (workarounds.md A14;
+    docs/issues/kueue-podsready-5min-eviction.md). On kueue-operator 1.4.x the
+    operator hardcodes `waitForPodsReady: {timeout: 5m0s}` from
+    `gangScheduling.policy: ByWorkload` (`buildWaitForPodsReady` in
+    pkg/configmap/configmap.go, no CR knob), which evicts every LLM workload
+    whose model takes >5m to load — pod deleted ~every 5m, LLMInferenceService
+    never Ready. Absent section = operator default `None` → no
+    `waitForPodsReady` at all; `gangScheduling` is optional in the CRD
+    (`policy` is required only *within* it, and the CEL rule passes when the
+    whole section is absent). **Do not re-enable `gangScheduling`** without
+    setting `byWorkload.timeoutSeconds` — which needs kueue-operator ≥
+    commit 2ec61a1 (1.5.x, not yet in stable-v1.4); and on post-2ec61a1
+    operators an absent section defaults to `ByWorkloadDefaults` (a 30-min
+    eviction), so absence is never the durable answer. Verify the generated
+    config with `oc get cm kueue-manager-config -n openshift-kueue-operator
+    -o jsonpath='{.data.controller_manager_config\.yaml}'`.
   - `Namespace/llm` labeled `kueue.openshift.io/managed: "true"`.
   - `ResourceFlavor/default` (any node) + `ResourceFlavor/l40s`
     (node-role.kubernetes.io/gpu + nvidia.com/gpu toleration — matches our GPU

@@ -282,6 +282,55 @@ removed as soon as a nightly ships the fix.
   `managedFields` from `-o json` by default, which made the previous form of
   this command (and the variant in the issue file) silently useless.
 
+### A14. Kueue CR — `gangScheduling` block removed (operator hardcodes a 5m PodsReady timeout)
+
+- **File:** `components/instances/kueue-instance/kueue.yaml` (entire
+  `gangScheduling` block deleted, commit `ee8870b` 2026-09-22)
+- **Without it:** GPU LLMInferenceService pods evicted every ~5m before the
+  model loads (kill ~4m37s after start), LLMInferenceService never Ready.
+  kueue-operator 1.4.x hardcodes `waitForPodsReady: {timeout: 5m0s}` from
+  `gangScheduling.policy: ByWorkload` (`buildWaitForPodsReady`), with no CR
+  knob to change it. Details:
+  [issues/kueue-podsready-5min-eviction.md](issues/kueue-podsready-5min-eviction.md)
+- **Found + fixed + verified 2026-09-22** (rhai-tmm rig, rhods 3.5.1 nightly,
+  kueue-operator v1.4.2 `stable-v1.4`): removed the block → ArgoCD synced →
+  `kueue-manager-config` regenerated **without** `waitForPodsReady` →
+  qwen3-6-27b-fp8 (30.9 GB modelcar) survived past its 5m boundary, 2/2 with
+  0 restarts, LLMInferenceService Ready. (One final kill exactly at the
+  controller-rollout boundary = the old leader's last 5m eviction; after that
+  no kills.)
+- **Jira:** no bug to file — the fix is merged upstream and tracked:
+  [OCPSTRAT-3301](https://redhat.atlassian.net/browse/OCPSTRAT-3301)
+  (cluster-level `waitForPodsReady` config, **Kueue 1.5**), implemented by
+  [openshift/kueue-operator commit 2ec61a1](https://github.com/openshift/kueue-operator/commit/2ec61a163a7ec00382251ad8451745e29d16142f)
+  (merged 2026-08-21; adds `byWorkload.timeoutSeconds`, `recoveryTimeoutSeconds`,
+  `requeuingStrategy`, `ByWorkloadDefaults`). Docs:
+  [OSDOCS-22178](https://redhat.atlassian.net/browse/OSDOCS-22178).
+  Per-workload overrides next:
+  [OCPKUEUE-862](https://redhat.atlassian.net/browse/OCPKUEUE-862) /
+  [OCPSTRAT-3594](https://redhat.atlassian.net/browse/OCPSTRAT-3594)
+  (Kueue 1.6). [OCPKUEUE-843](https://redhat.atlassian.net/browse/OCPKUEUE-843)
+  (M1) confirms post-fix `policy: None` = one-year timeout +
+  `blockAdmission: false` — eviction-free either way. Our channel tops out at
+  v1.4.2 (searched 2026-09-22), so the workaround stays.
+- **Do not re-enable `gangScheduling` on this rig** — `policy: ByWorkload`
+  re-arms the hardcoded 5m eviction and every LLM workload whose model takes
+  >5m to load loops forever. If gang scheduling is ever needed on ≥1.5, set
+  `byWorkload.timeoutSeconds` explicitly.
+- **Remove when:** kueue-operator ≥ 2ec61a1 (1.5.x) lands in the channel →
+  restore gang scheduling as an explicit `byWorkload.timeoutSeconds: 3600`
+  (intended fix; covers a cold 30 GB pull + load) or `policy: None`. Do NOT
+  rely on an absent section: post-2ec61a1 the operator default for absent
+  `gangScheduling` becomes `ByWorkloadDefaults` (a 30-min eviction timeout),
+  so "absent = None" silently changes meaning on upgrade.
+- **Detection:**
+  ```bash
+  oc get cm kueue-manager-config -n openshift-kueue-operator \
+    -o jsonpath='{.data.controller_manager_config\.yaml}' | grep -A2 waitForPodsReady
+  ```
+  Non-empty = eviction behavior armed; `timeout: 5m0s` = the 1.4.x hardcoded
+  trap.
+
 ---
 
 ## B. Structural GitOps / ordering accommodations (permanent)

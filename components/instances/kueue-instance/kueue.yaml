@@ -7,10 +7,6 @@ spec:
   logLevel: Normal
   operatorLogLevel: Normal
   config:
-    gangScheduling:
-      policy: ByWorkload
-      byWorkload:
-        admission: Parallel
     preemption:
       preemptionPolicy: FairSharing
     integrations:

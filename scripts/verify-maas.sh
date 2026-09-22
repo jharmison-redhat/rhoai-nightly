@@ -91,6 +91,11 @@ cleanup_test_resources() {
     oc delete maasmodelref "$MODEL_NAME" -n "$MODEL_NS" 2>/dev/null || true
     oc delete llminferenceservice "$MODEL_NAME" -n "$MODEL_NS" 2>/dev/null || true
 
+    # Re-sync the unified subscriptions + auth policy so the temp model drops out
+    if [ -x "$SCRIPT_DIR/setup-maas-subscriptions.sh" ]; then
+        "$SCRIPT_DIR/setup-maas-subscriptions.sh" 2>/dev/null || true
+    fi
+
     # Wait for pods to terminate
     if oc get namespace "$MODEL_NS" &>/dev/null; then
         oc wait pod --for=delete -l "app.kubernetes.io/name=$MODEL_NAME" -n "$MODEL_NS" --timeout=60s 2>/dev/null || true

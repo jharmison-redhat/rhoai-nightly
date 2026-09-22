@@ -9,7 +9,7 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
-.PHONY: help gpu cpu icsp uwm setup infra secrets gitops deploy bootstrap status all clean undeploy configure-repo scale refresh restart-catalog sync sync-app sync-disable sync-enable refresh-apps dedicate-masters maas maas-uninstall maas-verify maas-model maas-model-status maas-model-delete maas-external-model maas-external-model-delete observability observability-uninstall evalhub evalhub-uninstall autorag autorag-uninstall diagnose compare cleanup-projects preflight validate-config kueue-quota
+.PHONY: help gpu cpu icsp uwm setup infra secrets gitops deploy bootstrap status all clean undeploy configure-repo scale refresh restart-catalog sync sync-app sync-disable sync-enable refresh-apps dedicate-masters maas maas-uninstall maas-verify maas-model maas-model-status maas-model-delete maas-external-model maas-external-model-delete maas-subscriptions observability observability-uninstall evalhub evalhub-uninstall autorag autorag-uninstall diagnose compare cleanup-projects preflight validate-config kueue-quota
 
 # Applications owned by our two ApplicationSets, plus `cluster-config` (the
 # root app-of-apps that owns those ApplicationSets — included by name so the
@@ -85,6 +85,8 @@ help:
 	@echo "                             Requires MAAS_EXTERNAL_ENDPOINT, MAAS_EXTERNAL_MODEL,"
 	@echo "                             MAAS_EXTERNAL_API_KEY in .env (MAAS_EXTERNAL_PATH optional)"
 	@echo "  make maas-external-model-delete - Remove the external model"
+	@echo "  make maas-subscriptions - Sync unified MaaS subscriptions + auth policy"
+	@echo "                        with all registered models (auto-called by model deploys)"
 	@echo "  make maas-verify    - Verify MaaS (deploy simulator, test API, auth, rate limits)"
 	@echo "  make maas-uninstall - Remove MaaS resources created by install-maas.sh"
 	@echo "  make observability  - (Re-)install MaaS observability only (UWM + monitors + Kuadrant)"
@@ -325,6 +327,11 @@ maas-external-model:
 # Remove the external model registered by maas-external-model
 maas-external-model-delete:
 	@scripts/setup-maas-external-model.sh --delete
+
+# Sync the unified MaaS subscriptions + auth policy with all registered
+# models (create-if-missing, patch-if-changed; modelRefs from live state)
+maas-subscriptions:
+	@scripts/setup-maas-subscriptions.sh
 
 # Verify MaaS deployment (deploy test model, test API, auth, rate limits)
 maas-verify:

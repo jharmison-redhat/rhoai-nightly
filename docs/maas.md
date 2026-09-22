@@ -59,10 +59,10 @@ Available models:
 | **qwen3-6-27b-fp8** | 1 L40S-class GPU | Red Hat AI Qwen3-6-27B FP8 on RHAIIS 3.5.1, 128K context, 60Gi RAM |
 | **granite-tiny-gpu** | 1 GPU | RedHatAI Granite 4.0-h-tiny FP8 on vLLM CUDA, 24Gi RAM |
 
-Each model gets two subscription tiers (all authenticated users):
-
-- **Free** — 100 tokens/min
-- **Premium** — 100000 tokens/min
+Each model gets two subscription tiers (all authenticated users) via a single
+**unified pair** — `all-models-free` (50000 tokens/min) and `all-models-premium`
+(100000 tokens/min) — whose `modelRefs[]` cover every registered model,
+including external ones. See [Subscriptions](#subscriptions).
 
 Set defaults in `.env`:
 
@@ -77,6 +77,31 @@ make maas-model-status                   # show all deployed models
 make maas-model-delete MODEL=simulator   # delete one
 make maas-model-delete MODEL=all         # delete all
 ```
+
+## Subscriptions
+
+Models get access tiers through a single unified pair of `MaaSSubscription`s
+plus one `MaaSAuthPolicy` in `models-as-a-service` — there are no per-model
+subscription/auth-policy manifests:
+
+| Object | Covers | Details |
+|---|---|---|
+| `MaaSSubscription/all-models-free` | every registered model | 50000 tokens/min, priority 10 |
+| `MaaSSubscription/all-models-premium` | every registered model | 100000 tokens/min, priority 20 |
+| `MaaSAuthPolicy/all-models-access` | every registered model | subjects: `system:authenticated` |
+
+`modelRefs[]` is enumerated from **live cluster state**, never a static list:
+deploying a model (local or external) is all it takes — the next sync folds it
+in, and deleting a model drops it out. The sync runs automatically at the end
+of every `make maas-model` / `make maas-external-model` deploy and delete, or
+manually:
+
+```bash
+make maas-subscriptions
+```
+
+With zero registered models the sync is a no-op (the CRDs require at least one
+modelRef).
 
 ## External models (RHOAI 3.5+)
 

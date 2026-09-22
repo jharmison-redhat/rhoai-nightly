@@ -286,6 +286,10 @@ if [ "$DELETE" = true ]; then
             fi
         fi
     done
+
+    # Re-sync the unified subscriptions + auth policy so deleted models drop out
+    log_step "Re-syncing unified MaaS subscriptions"
+    "$SCRIPT_DIR/setup-maas-subscriptions.sh" || true
     exit 0
 fi
 
@@ -305,6 +309,10 @@ for path in $MODEL_PATHS; do
     log_info "Applying kustomize manifests..."
     oc kustomize "$path" | oc apply --server-side=true -f -
 done
+
+# Sync the unified subscriptions + auth policy with all registered models
+log_step "Syncing unified MaaS subscriptions"
+"$SCRIPT_DIR/setup-maas-subscriptions.sh"
 
 # =============================================================================
 # Wait for readiness

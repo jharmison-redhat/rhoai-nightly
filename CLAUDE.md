@@ -273,7 +273,7 @@ Available models:
 - `qwen3-6-27b-fp8` — Red Hat AI Qwen3-6-27B FP8 on RHAIIS 3.5.1 (1 L40S-class GPU, 60Gi RAM)
 - `granite-tiny-gpu` — RedHatAI Granite 4.0-h-tiny FP8 on vLLM GPU (1 GPU, 24Gi RAM)
 
-Each model gets free tier (100 tokens/min, all authenticated users) and premium tier (100000 tokens/min, all authenticated users).
+Each model gets free tier (50000 tokens/min, all authenticated users) and premium tier (100000 tokens/min, all authenticated users) via a single **unified pair** of MaaSSubscriptions (`all-models-free`, `all-models-premium`) plus `MaaSAuthPolicy/all-models-access` in `models-as-a-service` — there are no per-model subscription/auth-policy manifests. Their `modelRefs[]` cover every registered model (including external ones) and are enumerated from **live cluster state** by `scripts/setup-maas-subscriptions.sh` (`make maas-subscriptions`, also called automatically by every model deploy/delete): deploying a model folds it in, deleting one drops it out. With zero registered models the sync is a no-op (the CRDs require ≥1 modelRef).
 
 ### Repository Configuration (for forks)
 
@@ -608,7 +608,7 @@ With MaaS on (default), the operator attempts to deploy MaaS components as soon 
 
 Models are defined as kustomize manifests in `components/instances/maas-models/`. Each model directory contains:
 - `llm/` — LLMInferenceService (the workload)
-- `maas/` — MaaSModelRef + MaaSAuthPolicy + MaaSSubscription (free + premium tiers)
+- `maas/` — MaaSModelRef only (subscriptions + access are the unified cluster-wide pair, see above)
 
 `setup-maas-model.sh` deploys/deletes models using `oc kustomize`. It reads `MAAS_MODELS` from `.env` for model selection (default: **`auto`** — the script inspects GPU VRAM and picks simulator / granite-tiny-gpu / qwen3-6-27b-fp8).
 
@@ -1287,6 +1287,7 @@ oc get mcp  # MachineConfigPool status
 | `scripts/enable-uwm.sh` | Enable UWM (idempotent merge; --check / --dry-run modes) |
 | `scripts/install-maas.sh` | MaaS install (secrets, ArgoCD app, Authorino). Does NOT install observability |
 | `scripts/setup-maas-external-model.sh` | External model register/delete via ExternalProvider + ExternalModel (3.5+); renders templates from `.env` |
+| `scripts/setup-maas-subscriptions.sh` | Unified MaaS subscriptions + auth policy sync (modelRefs from live cluster state; `make maas-subscriptions`) |
 | `scripts/install-observability.sh` | MaaS observability install/uninstall (UWM, Kuadrant, ServiceMonitors) |
 | `scripts/install-autorag.sh` | AutoML/AutoRAG test-tenant install/uninstall (pg creds, instance-autorag Application) |
 | `scripts/uninstall-maas.sh` | MaaS uninstall (cascade delete + cleanup) |

@@ -104,10 +104,11 @@ if [ "$DELETE" = true ]; then
     log_step "Deleting external model: $MODEL_NAME"
     oc delete "externalmodel/$MODEL_NAME" -n llm --ignore-not-found=true
     oc delete "maasmodelref/$MODEL_NAME" -n llm --ignore-not-found=true
-    oc delete "maassubscription/${MODEL_NAME}-free" "maassubscription/${MODEL_NAME}-premium" \
-        "maasauthpolicy/${MODEL_NAME}-access" -n models-as-a-service --ignore-not-found=true
     oc delete "externalprovider/$PROVIDER_NAME" -n llm --ignore-not-found=true
     oc delete "secret/$SECRET_NAME" -n llm --ignore-not-found=true
+    # Re-sync the unified subscriptions + auth policy so the model drops out
+    log_step "Re-syncing unified MaaS subscriptions"
+    "$SCRIPT_DIR/setup-maas-subscriptions.sh" || true
     log_info "Deleted external model $MODEL_NAME resources"
     exit 0
 fi
@@ -179,6 +180,10 @@ done
 
 log_info "Applying rendered manifests..."
 oc apply --server-side=true -f "$RENDER_DIR"
+
+# Sync the unified subscriptions + auth policy with all registered models
+log_step "Syncing unified MaaS subscriptions"
+"$SCRIPT_DIR/setup-maas-subscriptions.sh"
 
 # =============================================================================
 # Wait for readiness
